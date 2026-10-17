@@ -14,7 +14,7 @@ enum ReadmeShot {
         DSHIntegration.shared.target = .recent
 
         let panel = PanelWindow()
-        let rect = NSRect(x: screen.frame.minX + 320,
+        let rect = NSRect(x: screen.frame.minX + 1200,
                           y: screen.frame.minY + 720,
                           width: 420, height: 240)
         panel.present(near: rect, on: screen)
@@ -23,9 +23,8 @@ enum ReadmeShot {
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
             let bounds = screen.frame.insetBy(dx: 12, dy: 40)
-            let captureSize = NSSize(width: 1000, height: 563)
-            let x = min(max(panel.frame.midX - captureSize.width / 2, bounds.minX),
-                        bounds.maxX - captureSize.width)
+            let captureSize = NSSize(width: 1600, height: 900)
+            let x = bounds.maxX - captureSize.width
             let y = min(max(panel.frame.midY - captureSize.height / 2, bounds.minY),
                         bounds.maxY - captureSize.height)
             let capture = NSRect(origin: NSPoint(x: x, y: y), size: captureSize)

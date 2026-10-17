@@ -4,7 +4,7 @@ Three-finger drag screen capture for macOS.
 
 Drag three fingers across a region. Release to capture it, add a note in the glass composer, and press Return. DragShot saves the image and note to `~/Pictures/DragShot/`, copies the image to the clipboard, and can send both into DeepSeek Harness.
 
-![DragShot composer over macOS 27's Tahoe wallpaper](assets/dragshot-example.png)
+![DragShot composer over macOS 27's Golden Gate wallpaper](assets/dragshot-example.png)
 
 ## Use it
 

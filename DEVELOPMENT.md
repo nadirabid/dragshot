@@ -223,7 +223,7 @@ Physical three-finger recognition and trackpad feel still need a hands-on check.
 
 - `mockups/` contains local design renders and screenshots; it is gitignored and must not be
   published.
-- The README image is a clean capture of the real AppKit composer using sample content and the built-in macOS 27 Tahoe Day wallpaper. It contains no personal desktop content.
+- The README image is a clean capture of the real AppKit composer using sample content and the built-in macOS 27 Golden Gate Sunset wallpaper. It contains no personal desktop content.
 - Test evidence stays in `$TMPDIR` and is not committed.
 - `build/`, local signing keys, and probe binaries are gitignored.
 
