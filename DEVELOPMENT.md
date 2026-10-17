@@ -244,6 +244,7 @@ Physical three-finger recognition and trackpad feel still need a hands-on check.
     Sources/Storage.swift           PNG, note, and clipboard output
     Sources/DSHIntegration.swift    DSH socket client, launch, and status
     dsh-dragshot/                   Cordis host bridge (plugin, protocol, installer, tests)
+    skills/install-dragshot/        DSH install skill and its wrapper script
     assets/dragshot-example.png     README illustration
     tests/SelfTest.swift            geometry, event, and visual checks
     tests/E2E.swift                 system-event and capture integration checks

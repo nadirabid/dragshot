@@ -26,6 +26,17 @@ open build/DragShot.app
 
 `./install.sh` installs a copy in Applications.
 
+### Install with DSH
+
+The repo ships an installer skill at [`skills/install-dragshot/SKILL.md`](skills/install-dragshot/SKILL.md). Link it into DSH once from the checkout root:
+
+```sh
+mkdir -p ~/.dsh/skills
+ln -sfn "$PWD/skills/install-dragshot" ~/.dsh/skills/install-dragshot
+```
+
+Then ask DSH to “Install DragShot from this repo.” It builds and installs the app, sets up the bridge, and walks through the permission and trackpad steps. Restart DSH once if the skill does not appear in its catalog.
+
 Enable three-finger drag in **System Settings → Accessibility → Pointer Control → Trackpad Options**:
 
 - Use trackpad for dragging: on
