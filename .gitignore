@@ -1,0 +1,13 @@
+# Build output
+build/
+
+# Local code-signing material (see README)
+*.pem
+*.p12
+
+# Probe scratch binaries
+probe/probe
+probe/probe2
+
+# Finder
+.DS_Store
