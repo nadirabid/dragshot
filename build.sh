@@ -52,6 +52,10 @@ swiftc \
 
 echo "==> bundling"
 cp "$ROOT/Info.plist" "$APP/Contents/Info.plist"
+# Brand images and any other flat resources.
+if compgen -G "$ROOT/Sources/*.png" > /dev/null; then
+  cp "$ROOT"/Sources/*.png "$APP/Contents/Resources/"
+fi
 
 echo "==> signing (identity: $SIGN_ID)"
 codesign --force --deep --sign "$SIGN_ID" \

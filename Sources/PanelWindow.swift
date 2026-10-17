@@ -18,6 +18,14 @@ final class PanelWindow: NSPanel, NSTextViewDelegate, NSWindowDelegate {
     private var placeAbove = false
     private var inputWidth: CGFloat = 480
     private var userPositioned = false
+    private let targetDock = NSView()
+    private let sendToLabel = NSTextField(labelWithString: "Send to")
+    private let targetChip = TargetChipView()
+    private var scrollBottomDefault: NSLayoutConstraint!
+    private var scrollBottomWithDock: NSLayoutConstraint!
+    private var sessionPicker: SessionPickerWindow?
+    private var pickerClosedAt: TimeInterval = 0
+    private var isClearingSlash = false
 
     init() {
         super.init(contentRect: NSRect(x: 0, y: 0, width: 480, height: 68),
@@ -83,9 +91,8 @@ final class PanelWindow: NSPanel, NSTextViewDelegate, NSWindowDelegate {
         attachmentWidth = attachment.widthAnchor.constraint(equalToConstant: previewSize.width)
         attachmentHeight = attachment.heightAnchor.constraint(equalToConstant: previewSize.height)
 
-        sendButton.isBordered = true
-        sendButton.bezelStyle = .accessoryBarAction
-        sendButton.showsBorderOnlyWhileMouseInside = true
+        sendButton.isBordered = false
+        sendButton.bezelStyle = .regularSquare
         sendButton.image = NSImage(systemSymbolName: "paperplane", accessibilityDescription: "Send")
         sendButton.symbolConfiguration = NSImage.SymbolConfiguration(paletteColors: [.labelColor])
             .applying(NSImage.SymbolConfiguration(pointSize: 17, weight: .medium))
@@ -94,21 +101,49 @@ final class PanelWindow: NSPanel, NSTextViewDelegate, NSWindowDelegate {
         sendButton.action = #selector(submitMessage)
         sendButton.toolTip = "Send capture"
         sendButton.setAccessibilityLabel("Send image and message")
+        sendButton.wantsLayer = true
+        sendButton.layer?.cornerRadius = 10
+        sendButton.layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.06).cgColor
+        sendButton.imageScaling = .scaleProportionallyDown
         sendButton.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(sendButton)
+
+        // Bottom destination dock. Hidden when DSH is off so the original
+        // compact composer is unchanged for non-DSH users.
+        sendToLabel.font = .systemFont(ofSize: 10.5, weight: .medium)
+        sendToLabel.textColor = .secondaryLabelColor
+        sendToLabel.translatesAutoresizingMaskIntoConstraints = false
+        targetDock.translatesAutoresizingMaskIntoConstraints = false
+        targetDock.addSubview(sendToLabel)
+        targetChip.translatesAutoresizingMaskIntoConstraints = false
+        targetChip.onClick = { [weak self] in self?.presentSessionPicker() }
+        targetDock.addSubview(targetChip)
+        content.addSubview(targetDock)
+        scrollBottomDefault = scroll.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -18)
+        scrollBottomWithDock = scroll.bottomAnchor.constraint(equalTo: targetDock.topAnchor, constant: -10)
+        scrollBottomDefault.isActive = true
 
         NSLayoutConstraint.activate([
             attachment.topAnchor.constraint(equalTo: content.topAnchor, constant: 16),
             attachment.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 18),
             attachmentWidth, attachmentHeight,
             scroll.topAnchor.constraint(equalTo: attachment.bottomAnchor, constant: 14),
-            scroll.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -18),
             scroll.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
             scroll.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -64),
             sendButton.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -14),
             sendButton.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -12),
             sendButton.widthAnchor.constraint(equalToConstant: 36),
             sendButton.heightAnchor.constraint(equalToConstant: 36),
+            targetDock.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
+            targetDock.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -16),
+            targetDock.heightAnchor.constraint(equalToConstant: 30),
+            targetDock.trailingAnchor.constraint(lessThanOrEqualTo: sendButton.leadingAnchor, constant: -8),
+            sendToLabel.leadingAnchor.constraint(equalTo: targetDock.leadingAnchor),
+            sendToLabel.centerYAnchor.constraint(equalTo: targetDock.centerYAnchor),
+            targetChip.leadingAnchor.constraint(equalTo: sendToLabel.trailingAnchor, constant: 7),
+            targetChip.centerYAnchor.constraint(equalTo: targetDock.centerYAnchor),
+            targetChip.trailingAnchor.constraint(equalTo: targetDock.trailingAnchor),
+            targetChip.heightAnchor.constraint(equalToConstant: 30),
         ])
     }
 
@@ -119,7 +154,8 @@ final class PanelWindow: NSPanel, NSTextViewDelegate, NSWindowDelegate {
         if event.type == .leftMouseDown, let contentView {
             let point = contentView.convert(event.locationInWindow, from: nil)
             if let hit = contentView.hitTest(point),
-               !hit.isDescendant(of: scroll), !hit.isDescendant(of: sendButton) {
+               !hit.isDescendant(of: scroll), !hit.isDescendant(of: sendButton),
+               !hit.isDescendant(of: targetDock) {
                 // AppKit owns tracking, display transitions, and the mouse-up. Controls
                 // keep their normal events, including selection inside the message.
                 userPositioned = true
@@ -140,7 +176,14 @@ final class PanelWindow: NSPanel, NSTextViewDelegate, NSWindowDelegate {
         attachmentWidth.constant = previewSize.width
         attachmentHeight.constant = previewSize.height
         attachment.prepare()
-        let initialHeight = 16 + previewSize.height + 14 + 26 + 18
+        dismissSessionPicker(restoreFocus: false)
+        let dockVisible = DSHIntegration.shared.isEnabled
+        targetDock.isHidden = !dockVisible
+        scrollBottomDefault.isActive = !dockVisible
+        scrollBottomWithDock.isActive = dockVisible
+        targetChip.title = DSHIntegration.shared.targetLabel
+        targetChip.setAccessibilityValue(DSHIntegration.shared.targetAccessibilityLabel)
+        let initialHeight = 16 + previewSize.height + 14 + 26 + 18 + (dockVisible ? 38 : 0)
         placeAbove = rect.minY - initialHeight - 14 < screen.visibleFrame.minY + 16
         textView.string = ""
         textView.setSelectedRange(NSRange(location: 0, length: 0))
@@ -169,7 +212,8 @@ final class PanelWindow: NSPanel, NSTextViewDelegate, NSWindowDelegate {
         layout.ensureLayout(for: container)
         let usedHeight = layout.usedRect(for: container).height
         let textHeight = min(max(26, ceil(usedHeight)), 130)
-        let height = 16 + previewSize.height + 14 + textHeight + 18
+        let dockVisible = DSHIntegration.shared.isEnabled
+        let height = 16 + previewSize.height + 14 + textHeight + 18 + (dockVisible ? 38 : 0)
         let visible = screen.visibleFrame
         let proposedX = userPositioned ? frame.minX : selection.midX - inputWidth / 2
         let x = min(max(proposedX, visible.minX + 16), visible.maxX - inputWidth - 16)
@@ -191,7 +235,9 @@ final class PanelWindow: NSPanel, NSTextViewDelegate, NSWindowDelegate {
     }
 
     func windowDidResignKey(_ notification: Notification) {
-        guard isVisible, !isKeyWindow else { return }
+        // The session picker is a sibling key window; resigning to it is not a
+        // reason to throw away the draft.
+        guard isVisible, !isKeyWindow, sessionPicker == nil else { return }
         Log.write("input dismissed: keyboard focus moved away")
         onCancel?()
     }
@@ -212,7 +258,89 @@ final class PanelWindow: NSPanel, NSTextViewDelegate, NSWindowDelegate {
         }
     }
 
+    // MARK: - Session picker
+
+    var isSessionPickerVisible: Bool { sessionPicker != nil }
+
+    func presentSessionPicker() {
+        guard DSHIntegration.shared.isEnabled, sessionPicker == nil, isVisible else { return }
+        // A click on the chip while the picker is open closes it and then reaches
+        // the chip. Do not immediately reopen on that same click.
+        guard ProcessInfo.processInfo.systemUptime - pickerClosedAt > 0.25 else { return }
+        let picker = SessionPickerWindow()
+        picker.target = DSHIntegration.shared.target
+        picker.onSelect = { [weak self] selection in
+            guard let self else { return }
+            switch selection {
+            case .new:
+                DSHIntegration.shared.target = .new
+            case .session(let session):
+                DSHIntegration.shared.target = .session(id: session.id, title: session.title)
+            }
+            self.targetChip.title = DSHIntegration.shared.targetLabel
+            self.targetChip.setAccessibilityValue(DSHIntegration.shared.targetAccessibilityLabel)
+            self.dismissSessionPicker(restoreFocus: true)
+        }
+        picker.onDismiss = { [weak self] in self?.dismissSessionPicker(restoreFocus: true) }
+        sessionPicker = picker
+        let anchor = targetChip.window?.convertToScreen(targetChip.convert(targetChip.bounds, to: nil))
+            ?? NSRect(x: frame.midX, y: frame.minY, width: 1, height: 1)
+        picker.present(above: anchor, on: screen ?? placementScreen)
+        Log.write("session picker opened")
+    }
+
+    func dismissSessionPicker(restoreFocus: Bool = true) {
+        guard let picker = sessionPicker else { return }
+        sessionPicker = nil
+        pickerClosedAt = ProcessInfo.processInfo.systemUptime
+        picker.onSelect = nil
+        picker.onDismiss = nil
+        picker.orderOut(nil)
+        if restoreFocus, isVisible {
+            makeKeyAndOrderFront(nil)
+            makeFirstResponder(textView)
+        }
+    }
+
+    func closeSessionPicker() {
+        dismissSessionPicker(restoreFocus: false)
+    }
+
+    /// The global event tap asks the composer first. A click inside the popover
+    /// is passed through; a click outside closes it and keeps the draft.
+    func handleOutsideInteraction(at point: NSPoint) -> Bool {
+        guard let picker = sessionPicker else { return false }
+        if picker.frame.contains(point) { return false }
+        dismissSessionPicker(restoreFocus: true)
+        return true
+    }
+
+#if DRAGSHOT_TESTING
+    var testPickerVisible: Bool { isSessionPickerVisible }
+    var testEditorFocused: Bool { firstResponder === textView }
+
+    func testTypeSlash() {
+        textView.insertText("/", replacementRange: NSRange(location: 0, length: 0))
+    }
+#endif
+
     func textDidChange(_ notification: Notification) {
+        if !isClearingSlash,
+           DSHIntegration.shared.isEnabled,
+           sessionPicker == nil,
+           !textView.hasMarkedText(),
+           textView.string == "/",
+           textView.selectedRange().location == 1 {
+            // DSH-style command entry: a leading slash opens the picker and is
+            // consumed. A slash after text remains literal.
+            isClearingSlash = true
+            textView.string = ""
+            textView.setSelectedRange(NSRange(location: 0, length: 0))
+            isClearingSlash = false
+            resizeToFit()
+            presentSessionPicker()
+            return
+        }
         resizeToFit()
     }
 }

@@ -4,7 +4,11 @@ A three-finger drag selects a screen region. Release to capture it and open an i
 Return saves the PNG and note to `~/Pictures/DragShot/` and copies the image to the clipboard.
 Shift-Return inserts a new line; Escape cancels.
 
-DSH submission is not wired yet. `Sources/Storage.swift` owns saving the finished capture.
+Return also sends to DeepSeek Harness when the DSH integration is enabled and the
+`dsh-dragshot` host plugin is installed. Choose the destination from the composer's bottom
+dock; it defaults to the most recent session. The capture is always saved locally and copied
+to the clipboard first; DSH delivery is additive. Without the integration, Return behaves as
+before.
 
 ## Interaction
 
@@ -27,17 +31,66 @@ A native glass input panel takes keyboard focus without activating or switching 
 It opens blank with a blinking cursor, follows the system appearance, and grows for multiline
 instructions. Longer input scrolls within a bounded panel. The image preview preserves the
 full screenshot's aspect ratio. Its brief arrival animation respects Reduce Motion; the
-composer itself appears immediately, with no fade or capture wait. A monochrome paper-plane button with a native hover highlight and
-Return both submit the image and message through the existing local save/clipboard pipeline.
+composer itself appears immediately, with no fade or capture wait. A subtle paper-plane
+button and Return both submit the image and message through the existing local save/clipboard
+pipeline.
 
 Drag the composer's background or attachment to reposition it using native window dragging.
 The message stays editable, and growing text preserves the position you chose.
 
-Clicking or scrolling outside, losing typing focus, or switching apps or Spaces cancels both
-the input and selection. Outside interactions still reach the app underneath. Clicking away
-during capture cancels the pending screenshot too. Return immediately dismisses both
+Clicking or scrolling outside, losing typing focus (except while the session picker is open),
+or switching apps or Spaces cancels both the input and selection. Outside interactions still
+reach the app underneath. Clicking away during capture cancels the pending screenshot too.
+Return immediately dismisses both
 surfaces and saves as soon as the image is ready, preserving early submissions. A failed save
 restores the composer and attachment for retry.
+
+## DSH integration
+
+DragShot can send the finished image and note into DSH. Choose the destination in the
+composer's bottom dock: the searchable picker lists new and recent sessions, and the default
+follows the newest session. The menu bar menu has the switch, a Most recent/New session
+fallback, and the bridge status.
+
+DSH runs a small Cordis host plugin, [`dsh-dragshot`](../dsh-dragshot), that owns a local
+Unix socket. DragShot writes one JSON request to that socket; the plugin calls the live
+`sessionController` in the DSH desktop host. This is necessary because the desktop app's
+web server is token-gated and its ACP profile is a separate process that cannot attach to a
+session the desktop app currently holds.
+
+Install the plugin once:
+
+    cd ../dsh-dragshot
+    ./install.sh /path/to/default/workspace
+
+If DSH is already running, its HMR watcher normally loads the new row. If the menu says
+“DSH bridge: Not loaded”, restart DSH once:
+
+    osascript -e 'quit app "DeepSeek Harness"'
+    sleep 2
+    open -a "DeepSeek Harness"
+
+The plugin writes its discovery file and socket here:
+
+    ~/Library/Application Support/DragShot/dsh-bridge.json
+    ~/Library/Application Support/DragShot/dsh.sock
+
+The composer's bottom dock shows “Send to [whale] DSH · <target>”. Click the chip to open the
+searchable picker. New session is always first; recent rows show the workspace, age, and
+running state. Choosing a row pins that session for subsequent captures; the menu's Most
+recent session clears the pin. Search is focused when the picker opens, arrow keys and Return
+work, and closing returns the cursor to the message field with the draft intact.
+
+Shortcuts while composing: `⌘/` toggles the picker. A leading `/` in an empty message opens
+it and is consumed; `/` after text stays literal.
+
+Known limits:
+
+- there is no screenshot-based routing heuristic yet;
+- a newly created session is not auto-selected in the DSH window; DSH is activated and the
+  session is visible in its sidebar, but selecting it still takes a click;
+- the picker reads the session list when it opens and does not live-update while open;
+- the bridge is local-only and trusts processes running as the same user.
 
 ## Trackpad setup
 
@@ -146,9 +199,12 @@ a hands-on check.
     Sources/Multitouch.swift        three-finger recognition
     Sources/OverlayWindow.swift     transparent selection window
     Sources/OverlayRenderer.swift   border, crosshair, and readout in Cocoa points
-    Sources/PanelWindow.swift       transient native glass input
+    Sources/PanelWindow.swift       transient native glass input and target dock
+    Sources/TargetChipView.swift    DSH whale, target chip, and send dock appearance
+    Sources/SessionPicker.swift     searchable session list and picker panel
     Sources/ScreenCapture.swift     bounded asynchronous region capture
     Sources/Storage.swift           PNG, note, and clipboard output
+    Sources/DSHIntegration.swift    DSH socket client, launch, and status
     tests/SelfTest.swift            geometry, event, and visual checks
     tests/E2E.swift                 system-event and capture integration checks
     tests/UITests.swift             dismissal, focus, multiline input, and material previews

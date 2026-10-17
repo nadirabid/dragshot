@@ -31,7 +31,9 @@ enum SelfTest {
         for scale: CGFloat in [1, 2] { rendering(scale: scale) }
         liveViewRendering()
         panelRendering()
-        print("PASS: coordinates, event suppression, Escape, transparent rendering at 1x/2x, live view, panel")
+        pickerRendering()
+        pickerTrigger()
+        print("PASS: coordinates, event suppression, Escape, transparent rendering at 1x/2x, live view, panel, picker, slash trigger")
         print("Visual evidence: \(output.path)")
     }
 
@@ -52,6 +54,17 @@ enum SelfTest {
     private static func eventRouting() {
         EventTap.hotkeyEnabled = true
         EventTap.canBegin = { true }
+        var pickerToggled = false
+        EventTap.onTogglePicker = { pickerToggled = true; return true }
+        let slash = CGEvent(keyboardEventSource: nil, virtualKey: 44, keyDown: true)!
+        slash.flags = [.maskCommand]
+        require(EventTap.handle(type: .keyDown, event: slash) == nil,
+                "Cmd+/ must be consumed")
+        require(pickerToggled, "Cmd+/ must invoke the picker toggle")
+        slash.type = .keyUp
+        require(EventTap.handle(type: .keyUp, event: slash) == nil,
+                "Cmd+/ release must be consumed")
+        EventTap.onTogglePicker = { false }
         var began = CGPoint.zero
         var ended = CGPoint.zero
         var moves = 0
@@ -199,5 +212,43 @@ enum SelfTest {
         view.cacheDisplay(in: view.bounds, to: rep)
         write(rep.cgImage!, name: "panel.png")
         panel.orderOut(nil)
+    }
+
+    private static func pickerTrigger() {
+        let previous = DSHIntegration.shared.isEnabled
+        DSHIntegration.shared.isEnabled = true
+        defer { DSHIntegration.shared.isEnabled = previous }
+        let panel = PanelWindow()
+        panel.present(near: NSRect(x: 200, y: 400, width: 400, height: 200), on: NSScreen.main!)
+        panel.testTypeSlash()
+        require(panel.testPickerVisible, "a leading slash opens the session picker")
+        panel.dismissSessionPicker()
+        require(panel.testEditorFocused, "closing the picker returns focus to the message field")
+        panel.orderOut(nil)
+    }
+
+    private static func pickerRendering() {
+        let sessions = [
+            DSHSession(id: "a", title: "First session", cwd: "/tmp/ProjectA",
+                       updatedAt: Date().timeIntervalSince1970 - 120,
+                       lastPromptAt: Date().timeIntervalSince1970 - 120,
+                       running: true, blank: false),
+            DSHSession(id: "b", title: "Second session", cwd: "/tmp/ProjectB",
+                       updatedAt: Date().timeIntervalSince1970 - 7200,
+                       lastPromptAt: Date().timeIntervalSince1970 - 7200,
+                       running: false, blank: false),
+        ]
+        let picker = SessionPickerWindow()
+        picker.injectSessions(sessions, target: .recent)
+        require(picker.testSummary.contains("visible=2"), "picker shows the injected sessions")
+        require(picker.testSummary.contains("selected=1"), "recent target selects the newest session")
+        picker.injectSessions(sessions, target: .new)
+        require(picker.testSummary.contains("selected=0"), "new target selects the New session row")
+        let view = picker.contentView!
+        view.layoutSubtreeIfNeeded()
+        let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
+        view.cacheDisplay(in: view.bounds, to: rep)
+        write(rep.cgImage!, name: "picker.png")
+        picker.orderOut(nil)
     }
 }

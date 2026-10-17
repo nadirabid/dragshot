@@ -10,6 +10,7 @@ enum EventTap {
     static var onCancel: () -> Bool = { false }
     static var onAim: (NSPoint) -> Void = { _ in }
     static var onOutsideInteraction: (NSPoint) -> Bool = { _ in false }
+    static var onTogglePicker: () -> Bool = { false }
     static var hotkeyEnabled = false
 
     private static var tap: CFMachPort?
@@ -77,6 +78,11 @@ enum EventTap {
                 aiming = true
                 swallowedKeys.insert(key)
                 onAim(point)
+                return nil
+            }
+            if key == 44, event.flags.contains(.maskCommand), !dragging, !aiming,
+               onTogglePicker() {
+                swallowedKeys.insert(key)
                 return nil
             }
             return Unmanaged.passUnretained(event)

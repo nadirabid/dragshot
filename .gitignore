@@ -11,3 +11,6 @@ probe/probe2
 
 # Finder
 .DS_Store
+
+# Local design renders and screenshots (not published)
+mockups/

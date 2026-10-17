@@ -34,6 +34,10 @@ final class DragShot {
         EventTap.onAim = { [weak self] in self?.aim(at: $0) }
         EventTap.onCancel = { [weak self] in
             guard let self else { return false }
+            if self.state == .composing, let panel = self.panel, panel.isSessionPickerVisible {
+                panel.dismissSessionPicker()
+                return true
+            }
             if self.state == .composing,
                let editor = self.panel?.firstResponder as? NSTextView, editor.hasMarkedText() {
                 return false
@@ -41,11 +45,23 @@ final class DragShot {
             return self.cancel()
         }
         EventTap.onOutsideInteraction = { [weak self] point in
-            guard let self else { return false }
-            guard self.state == .composing, let panel = self.panel,
-                  !panel.frame.contains(point) else { return false }
+            guard let self, self.state == .composing, let panel = self.panel else { return false }
+            if panel.isSessionPickerVisible {
+                return panel.handleOutsideInteraction(at: point)
+            }
+            guard !panel.frame.contains(point) else { return false }
             Log.write("input dismissed: outside interaction")
             return self.cancel()
+        }
+        EventTap.onTogglePicker = { [weak self] in
+            guard let self, self.state == .composing, let panel = self.panel,
+                  DSHIntegration.shared.isEnabled else { return false }
+            if panel.isSessionPickerVisible {
+                panel.dismissSessionPicker()
+            } else {
+                panel.presentSessionPicker()
+            }
+            return true
         }
         let workspace = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.didActivateApplicationNotification,
@@ -204,9 +220,22 @@ final class DragShot {
 
     private func finishSubmission(text: String, image: CGImage) {
         do {
-            let name = try Storage.save(image: image, text: text)
+            let saved = try Storage.save(image: image, text: text)
             try Storage.copyToPasteboard(image: image)
-            Log.write("saved \(name) (\(image.width)x\(image.height))")
+            Log.write("saved \(saved.name) (\(image.width)x\(image.height))")
+            if DSHIntegration.shared.isEnabled {
+                DSHIntegration.shared.send(image: image, text: text) { result in
+                    switch result {
+                    case .success(let sent):
+                        let suffix = sent.title.flatMap { $0.isEmpty ? nil : " · \($0)" } ?? ""
+                        Notice.show(sent.created
+                            ? "Sent to new DSH session"
+                            : "Sent to DSH\(suffix)")
+                    case .failure(let error):
+                        Notice.show("Saved locally — \(error.localizedDescription)")
+                    }
+                }
+            }
         } catch {
             Log.write("save failed: \(error.localizedDescription)")
             state = .composing
@@ -215,6 +244,9 @@ final class DragShot {
             Notice.show("Couldn’t finish saving. \(error.localizedDescription)")
             return
         }
+        // The agent send is asynchronous. Dismiss immediately, as the local
+        // save path always has; a failure still leaves the PNG, note, and
+        // clipboard contents behind and reports through the notice.
         reset()
     }
 
@@ -223,6 +255,7 @@ final class DragShot {
         state = .idle
         captureTask?.cancel()
         captureTask = nil
+        panel?.closeSessionPicker()
         panel?.orderOut(nil)
         panel = nil
         pendingImage = nil
