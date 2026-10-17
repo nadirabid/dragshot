@@ -131,7 +131,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let recent = NSMenuItem(title: "Most recent session",
                                 action: #selector(useRecentDSHTarget), keyEquivalent: "")
         recent.state = integration.target == .recent ? .on : .off
-        let fresh = NSMenuItem(title: "New session",
+        let fresh = NSMenuItem(title: "New chat",
                                action: #selector(useNewDSHTarget), keyEquivalent: "")
         fresh.state = integration.target == .new ? .on : .off
         targetMenu.addItem(recent)

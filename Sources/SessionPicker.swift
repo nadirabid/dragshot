@@ -6,7 +6,7 @@ private final class SessionPickerRow: NSView {
 
     private let iconContainer = NSView()
     private let whale = NSImageView()
-    private let plus = NSImageView()
+    private let newIcon = NSImageView()
     private let titleLabel = NSTextField(labelWithString: "")
     private let subtitleLabel = NSTextField(labelWithString: "")
     private let check = NSImageView()
@@ -57,14 +57,14 @@ private final class SessionPickerRow: NSView {
         whale.translatesAutoresizingMaskIntoConstraints = false
         iconContainer.addSubview(whale)
 
-        plus.image = NSImage(systemSymbolName: "plus", accessibilityDescription: "New session")
-        plus.contentTintColor = .controlAccentColor
-        plus.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 13, weight: .medium)
-        plus.translatesAutoresizingMaskIntoConstraints = false
-        iconContainer.addSubview(plus)
+        newIcon.image = NSImage(systemSymbolName: "bubble.left", accessibilityDescription: "New chat")
+        newIcon.contentTintColor = .controlAccentColor
+        newIcon.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 13, weight: .medium)
+        newIcon.translatesAutoresizingMaskIntoConstraints = false
+        iconContainer.addSubview(newIcon)
 
         whale.isHidden = newSession
-        plus.isHidden = !newSession
+        newIcon.isHidden = !newSession
         iconContainer.layer?.backgroundColor = newSession
             ? NSColor.controlAccentColor.withAlphaComponent(0.12).cgColor
             : NSColor.clear.cgColor
@@ -81,6 +81,7 @@ private final class SessionPickerRow: NSView {
         subtitleLabel.lineBreakMode = .byTruncatingTail
         subtitleLabel.maximumNumberOfLines = 1
         subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        subtitleLabel.isHidden = newSession
         addSubview(subtitleLabel)
 
         check.image = NSImage(systemSymbolName: "checkmark", accessibilityDescription: "Selected")
@@ -89,6 +90,11 @@ private final class SessionPickerRow: NSView {
         check.translatesAutoresizingMaskIntoConstraints = false
         check.isHidden = true
         addSubview(check)
+
+        let titleTop = titleLabel.topAnchor.constraint(equalTo: topAnchor, constant: 7)
+        let titleCenter = titleLabel.centerYAnchor.constraint(equalTo: centerYAnchor)
+        titleTop.isActive = !newSession
+        titleCenter.isActive = newSession
 
         NSLayoutConstraint.activate([
             iconContainer.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
@@ -101,14 +107,13 @@ private final class SessionPickerRow: NSView {
             whale.topAnchor.constraint(equalTo: iconContainer.topAnchor),
             whale.bottomAnchor.constraint(equalTo: iconContainer.bottomAnchor),
 
-            plus.centerXAnchor.constraint(equalTo: iconContainer.centerXAnchor),
-            plus.centerYAnchor.constraint(equalTo: iconContainer.centerYAnchor),
-            plus.widthAnchor.constraint(equalToConstant: 14),
-            plus.heightAnchor.constraint(equalToConstant: 14),
+            newIcon.centerXAnchor.constraint(equalTo: iconContainer.centerXAnchor),
+            newIcon.centerYAnchor.constraint(equalTo: iconContainer.centerYAnchor),
+            newIcon.widthAnchor.constraint(equalToConstant: 14),
+            newIcon.heightAnchor.constraint(equalToConstant: 14),
 
             titleLabel.leadingAnchor.constraint(equalTo: iconContainer.trailingAnchor, constant: 9),
             titleLabel.trailingAnchor.constraint(equalTo: check.leadingAnchor, constant: -6),
-            titleLabel.topAnchor.constraint(equalTo: topAnchor, constant: 7),
 
             subtitleLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
             subtitleLabel.trailingAnchor.constraint(equalTo: titleLabel.trailingAnchor),
@@ -122,7 +127,7 @@ private final class SessionPickerRow: NSView {
 
         setAccessibilityElement(true)
         setAccessibilityRole(.button)
-        setAccessibilityLabel("Session")
+        setAccessibilityLabel(newSession ? "New chat" : "Session")
         toolTip = nil
     }
 
@@ -220,11 +225,6 @@ final class SessionPickerWindow: NSPanel, NSTextFieldDelegate {
     private var isDismissing = false
     private var hasPresented = false
 
-#if DRAGSHOT_TESTING
-    /// Test-only session list used by the clean README screenshot mode.
-    static var testSessions: [DSHSession]?
-#endif
-
     private let panelWidth: CGFloat = 340
     private let rowHeight: CGFloat = 40
     private let maxVisibleRows = 5
@@ -238,7 +238,7 @@ final class SessionPickerWindow: NSPanel, NSTextFieldDelegate {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         isOpaque = false
         backgroundColor = .clear
-        hasShadow = true
+        hasShadow = false
         isReleasedWhenClosed = false
         hidesOnDeactivate = false
         becomesKeyOnlyIfNeeded = false
@@ -248,20 +248,27 @@ final class SessionPickerWindow: NSPanel, NSTextFieldDelegate {
         surface.wantsLayer = true
         surface.layer?.cornerRadius = 18
         surface.layer?.masksToBounds = true
-        surface.layer?.borderWidth = 1
-        surface.layer?.borderColor = NSColor.white.withAlphaComponent(0.45).cgColor
 
-        let backing = GlassTintView(tintAlpha: 0.50, borderAlpha: 0, cornerRadius: 18)
-        backing.frame = surface.bounds
-        backing.autoresizingMask = [.width, .height]
-        surface.addSubview(backing)
-        let glass = NSGlassEffectView(frame: surface.bounds)
+        let glass = GlassSurfaceView(cornerRadius: 18)
+        glass.frame = surface.bounds
         glass.autoresizingMask = [.width, .height]
-        glass.style = .regular
-        glass.cornerRadius = 18
-        glass.tintColor = GlassPalette.whiteTint(light: 0.80, dark: 0.20)
-        let content = GlassTintView(tintAlpha: 0.20, borderAlpha: 0.65, cornerRadius: 18)
-        glass.contentView = content
+        let fill = GlassFillView(alpha: 0.60)
+        fill.translatesAutoresizingMaskIntoConstraints = false
+        glass.addSubview(fill)
+        let content = NSView()
+        content.wantsLayer = true
+        content.translatesAutoresizingMaskIntoConstraints = false
+        glass.addSubview(content)
+        NSLayoutConstraint.activate([
+            fill.leadingAnchor.constraint(equalTo: glass.leadingAnchor),
+            fill.trailingAnchor.constraint(equalTo: glass.trailingAnchor),
+            fill.topAnchor.constraint(equalTo: glass.topAnchor),
+            fill.bottomAnchor.constraint(equalTo: glass.bottomAnchor),
+            content.leadingAnchor.constraint(equalTo: glass.leadingAnchor),
+            content.trailingAnchor.constraint(equalTo: glass.trailingAnchor),
+            content.topAnchor.constraint(equalTo: glass.topAnchor),
+            content.bottomAnchor.constraint(equalTo: glass.bottomAnchor),
+        ])
         surface.addSubview(glass)
         contentView = surface
         contentViewBox = content
@@ -342,8 +349,7 @@ final class SessionPickerWindow: NSPanel, NSTextFieldDelegate {
 
     private func configureRows() {
         newRow.translatesAutoresizingMaskIntoConstraints = false
-        newRow.title = "New session"
-        newRow.subtitle = "in the most recent workspace"
+        newRow.title = "New chat"
         contentViewBox.addSubview(newRow)
 
         sectionLabel.font = .systemFont(ofSize: 9, weight: .bold)
@@ -421,13 +427,6 @@ final class SessionPickerWindow: NSPanel, NSTextFieldDelegate {
         self.anchor = anchor
         self.panelFrame = panelFrame
         anchorScreen = screen ?? NSScreen.main
-#if DRAGSHOT_TESTING
-        if let testSessions = Self.testSessions {
-            sessions = testSessions
-            loading = false
-            errorText = nil
-        }
-#endif
         rebuildRows(resetSelection: true)
         positionWindow()
         makeKeyAndOrderFront(nil)
@@ -435,11 +434,7 @@ final class SessionPickerWindow: NSPanel, NSTextFieldDelegate {
             guard let self else { return }
             self.makeFirstResponder(self.searchField)
         }
-#if DRAGSHOT_TESTING
-        if Self.testSessions == nil { loadSessions() }
-#else
         loadSessions()
-#endif
     }
 
     /// Test hook. The self-test can drive the picker without DSH.
@@ -539,7 +534,6 @@ final class SessionPickerWindow: NSPanel, NSTextFieldDelegate {
             }
         }
 
-        newRow.subtitle = "in \(newWorkspaceName())"
         sectionLabel.stringValue = query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "RECENT" : "RESULTS"
         countLabel.stringValue = visibleSessions.isEmpty ? "" : "\(visibleSessions.count)"
 
@@ -586,10 +580,6 @@ final class SessionPickerWindow: NSPanel, NSTextFieldDelegate {
         if let cwd = session.workspaceName { parts.append(cwd) }
         if let age = relativeAge(session.activity) { parts.append(age) }
         return parts.isEmpty ? "DSH session" : parts.joined(separator: " · ")
-    }
-
-    private func newWorkspaceName() -> String {
-        sessions.first?.workspaceName ?? "the most recent workspace"
     }
 
     private func relativeAge(_ timestamp: TimeInterval) -> String? {

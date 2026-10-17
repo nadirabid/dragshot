@@ -43,11 +43,11 @@ capture is pending is preserved and submitted when the image is ready.
 ## DeepSeek Harness integration
 
 The composer's bottom dock targets a DSH session. The chip defaults to **Most recent** and can
-pin a specific session or **New session**. The target is stored in `UserDefaults` and survives
+pin a specific session or **New chat**. The target is stored in `UserDefaults` and survives
 later captures and relaunches. The local PNG/note save and clipboard copy always happen first;
 DSH delivery is additive.
 
-Clicking the chip opens a nonactivating searchable picker. New session is pinned first, followed
+Clicking the chip opens a nonactivating searchable picker. New chat is pinned first, followed
 by recent sessions with workspace, age, and running state. Search takes focus on open; Up/Down
 and Return work; selecting a row pins it and returns the cursor to the message field with the
 draft intact. Escape or an outside click closes the picker first. The target list is read from
@@ -59,7 +59,7 @@ Shortcuts while composing:
 - `/` opens it when the message is empty and the caret is at the start; the slash is consumed.
 - A slash after text remains literal.
 
-The menu bar menu can switch back to **Most recent** or **New session**, which clears a pin.
+The menu bar menu can switch back to **Most recent** or **New chat**, which clears a pin.
 When DSH is disabled the target dock is hidden and Return behaves as a local-only capture.
 
 ### Architecture
@@ -223,7 +223,7 @@ Physical three-finger recognition and trackpad feel still need a hands-on check.
 
 - `mockups/` contains local design renders and screenshots; it is gitignored and must not be
   published.
-- The README image is a clean capture of the real AppKit UI using sample sessions and the built-in macOS 27 Tahoe Day wallpaper. It contains no personal desktop content.
+- The README image is a clean capture of the real AppKit composer using sample content and the built-in macOS 27 Tahoe Day wallpaper. It contains no personal desktop content.
 - Test evidence stays in `$TMPDIR` and is not committed.
 - `build/`, local signing keys, and probe binaries are gitignored.
 
@@ -235,6 +235,9 @@ Physical three-finger recognition and trackpad feel still need a hands-on check.
     Sources/OverlayWindow.swift     transparent selection window
     Sources/OverlayRenderer.swift   border, crosshair, and readout in Cocoa points
     Sources/PanelWindow.swift       transient native glass input and target dock
+    Sources/GlassSurfaceView.swift  shared NSVisualEffectView popover material
+    Sources/GlassFillView.swift     appearance-aware fill for text readability
+    Sources/SendButton.swift        quiet chip-sized send control
     Sources/TargetChipView.swift    DSH whale, target chip, and send dock appearance
     Sources/SessionPicker.swift     searchable session list and picker panel
     Sources/ScreenCapture.swift     bounded asynchronous region capture

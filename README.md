@@ -4,14 +4,14 @@ Three-finger drag screen capture for macOS.
 
 Drag three fingers across a region. Release to capture it, add a note in the glass composer, and press Return. DragShot saves the image and note to `~/Pictures/DragShot/`, copies the image to the clipboard, and can send both into DeepSeek Harness.
 
-![DragShot composer and DSH session picker over macOS 27's Tahoe wallpaper](assets/dragshot-example.png)
+![DragShot composer over macOS 27's Tahoe wallpaper](assets/dragshot-example.png)
 
 ## Use it
 
 1. Three-finger drag across a region.
 2. Type a note. Return submits; Shift-Return adds a line; Escape cancels.
 3. The PNG and note land in `~/Pictures/DragShot/`; the image is on the clipboard.
-4. To target DSH, use the chip at the bottom of the composer. It defaults to the most recent session; click it to search and pin a session or start a new one. `⌘/` toggles the picker, and a leading `/` opens it in an empty message.
+4. To target DSH, use the chip at the bottom of the composer. It defaults to the most recent session; click it to search and pin a session or choose New chat. `⌘/` toggles the picker, and a leading `/` opens it in an empty message.
 
 Click outside or switch apps to dismiss the composer; drag its background to move it.
 

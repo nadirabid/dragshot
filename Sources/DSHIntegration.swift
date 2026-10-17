@@ -88,7 +88,7 @@ final class DSHIntegration {
         var title: String {
             switch self {
             case .recent: return "Most recent"
-            case .new: return "New session"
+            case .new: return "New chat"
             case .session(_, let title): return title
             }
         }
@@ -321,7 +321,7 @@ final class DSHIntegration {
     // MARK: - Sessions
 
     /// Read the bridge's session list. This does not launch DSH: the picker can
-    /// still offer New session, and sending that will launch it. Completion is
+    /// still offer New chat, and sending that will launch it. Completion is
     /// always delivered on the main queue.
     func listSessions(completion: @escaping (Result<[DSHSession], Error>) -> Void) {
         guard isEnabled else {
@@ -338,7 +338,7 @@ final class DSHIntegration {
             guard wasRunning else {
                 DispatchQueue.main.async {
                     completion(.failure(DSHIntegrationError.bridgeUnavailable(
-                        "DSH is not running. Choose New session to launch it.")))
+                        "DSH is not running. Choose New chat to launch it.")))
                 }
                 return
             }

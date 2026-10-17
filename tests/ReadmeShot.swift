@@ -1,8 +1,8 @@
 import Cocoa
 
-/// Produces a clean README screenshot from the real AppKit composer and picker.
-/// It uses sample session data and a caller-supplied wallpaper, so no personal
-/// desktop content is captured.
+/// Produces a clean README image from the real AppKit composer. It uses a
+/// caller-supplied wallpaper and sample content, so no personal desktop
+/// content is captured.
 enum ReadmeShot {
     static func run(backgroundPath: String) {
         guard let screen = NSScreen.main else { exit(2) }
@@ -14,45 +14,27 @@ enum ReadmeShot {
         DSHIntegration.shared.target = .recent
 
         let panel = PanelWindow()
-        let rect = NSRect(x: screen.frame.minX + 280,
-                          y: screen.frame.minY + 260,
+        let rect = NSRect(x: screen.frame.minX + 320,
+                          y: screen.frame.minY + 720,
                           width: 420, height: 240)
         panel.present(near: rect, on: screen)
         panel.attach(fixture())
         panel.setDraftForTesting("What’s off in this chart?")
-        SessionPickerWindow.testSessions = sampleSessions()
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-            panel.presentSessionPicker()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
-                guard let picker = NSApp.windows.compactMap({ $0 as? SessionPickerWindow }).first else {
-                    exit(2)
-                }
-                let union = panel.frame.union(picker.frame).insetBy(dx: -90, dy: -70)
-                let capture = union.intersection(screen.frame.insetBy(dx: 12, dy: 40))
-                Task { @MainActor in
-                    try? await E2E.screenshot(screen: screen, rect: capture, name: "readme-shot.png")
-                    exit(0)
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 8) { exit(0) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+            let bounds = screen.frame.insetBy(dx: 12, dy: 40)
+            let captureSize = NSSize(width: 1000, height: 563)
+            let x = min(max(panel.frame.midX - captureSize.width / 2, bounds.minX),
+                        bounds.maxX - captureSize.width)
+            let y = min(max(panel.frame.midY - captureSize.height / 2, bounds.minY),
+                        bounds.maxY - captureSize.height)
+            let capture = NSRect(origin: NSPoint(x: x, y: y), size: captureSize)
+            Task { @MainActor in
+                try? await E2E.screenshot(screen: screen, rect: capture, name: "readme-shot.png")
+                exit(0)
             }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 8) { exit(0) }
         }
-    }
-
-    private static func sampleSessions() -> [DSHSession] {
-        let now = Date().timeIntervalSince1970
-        return [
-            DSHSession(id: "readme-a", title: "Landing page review", cwd: "/Projects/Website",
-                       updatedAt: now - 720, lastPromptAt: now - 720, running: true, blank: false),
-            DSHSession(id: "readme-b", title: "Q3 planning notes", cwd: "/Documents/Planning",
-                       updatedAt: now - 3_600, lastPromptAt: now - 3_600, running: false, blank: false),
-            DSHSession(id: "readme-c", title: "Launch checklist", cwd: "/Projects/DragShot",
-                       updatedAt: now - 172_800, lastPromptAt: now - 172_800, running: false, blank: false),
-            DSHSession(id: "readme-d", title: "Design QA", cwd: "/Projects/Website",
-                       updatedAt: now - 259_200, lastPromptAt: now - 259_200, running: false, blank: false),
-            DSHSession(id: "readme-e", title: "Research notes", cwd: "/Documents/Notes",
-                       updatedAt: now - 345_600, lastPromptAt: now - 345_600, running: false, blank: false),
-        ]
     }
 
     private static func fixture() -> CGImage {

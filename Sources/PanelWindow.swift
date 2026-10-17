@@ -9,7 +9,7 @@ final class PanelWindow: NSPanel, NSTextViewDelegate, NSWindowDelegate {
     private let textView = NSTextView()
     private let scroll = NSScrollView()
     private let attachment = AttachmentPreview()
-    private let sendButton = NSButton()
+    private let sendButton = SendButton()
     private var attachmentWidth: NSLayoutConstraint!
     private var attachmentHeight: NSLayoutConstraint!
     private var previewSize = NSSize(width: 240, height: 132)
@@ -34,7 +34,7 @@ final class PanelWindow: NSPanel, NSTextViewDelegate, NSWindowDelegate {
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
         isOpaque = false
         backgroundColor = .clear
-        hasShadow = true
+        hasShadow = false
         isMovable = true
         isReleasedWhenClosed = false
         hidesOnDeactivate = false
@@ -44,17 +44,26 @@ final class PanelWindow: NSPanel, NSTextViewDelegate, NSWindowDelegate {
 
         let surface = InputSurface(frame: NSRect(x: 0, y: 0, width: 480, height: 68))
         surface.wantsLayer = true
-        let backing = GlassTintView(tintAlpha: 0.55, borderAlpha: 0, cornerRadius: 22)
-        backing.frame = surface.bounds
-        backing.autoresizingMask = [.width, .height]
-        surface.addSubview(backing)
-        let glass = NSGlassEffectView(frame: surface.bounds)
+        let glass = GlassSurfaceView(cornerRadius: 22)
+        glass.frame = surface.bounds
         glass.autoresizingMask = [.width, .height]
-        glass.style = .regular
-        glass.cornerRadius = 22
-        glass.tintColor = GlassPalette.whiteTint(light: 0.78, dark: 0.18)
-        let content = GlassTintView(tintAlpha: 0.78, borderAlpha: 0.70, cornerRadius: 22)
-        glass.contentView = content
+        let fill = GlassFillView(alpha: 0.60)
+        fill.translatesAutoresizingMaskIntoConstraints = false
+        glass.addSubview(fill)
+        let content = NSView()
+        content.wantsLayer = true
+        content.translatesAutoresizingMaskIntoConstraints = false
+        glass.addSubview(content)
+        NSLayoutConstraint.activate([
+            fill.leadingAnchor.constraint(equalTo: glass.leadingAnchor),
+            fill.trailingAnchor.constraint(equalTo: glass.trailingAnchor),
+            fill.topAnchor.constraint(equalTo: glass.topAnchor),
+            fill.bottomAnchor.constraint(equalTo: glass.bottomAnchor),
+            content.leadingAnchor.constraint(equalTo: glass.leadingAnchor),
+            content.trailingAnchor.constraint(equalTo: glass.trailingAnchor),
+            content.topAnchor.constraint(equalTo: glass.topAnchor),
+            content.bottomAnchor.constraint(equalTo: glass.bottomAnchor),
+        ])
         surface.addSubview(glass)
         contentView = surface
 
@@ -95,19 +104,14 @@ final class PanelWindow: NSPanel, NSTextViewDelegate, NSWindowDelegate {
         attachmentWidth = attachment.widthAnchor.constraint(equalToConstant: previewSize.width)
         attachmentHeight = attachment.heightAnchor.constraint(equalToConstant: previewSize.height)
 
-        sendButton.isBordered = false
-        sendButton.bezelStyle = .regularSquare
         sendButton.image = NSImage(systemSymbolName: "paperplane", accessibilityDescription: "Send")
-        sendButton.symbolConfiguration = NSImage.SymbolConfiguration(paletteColors: [.labelColor])
-            .applying(NSImage.SymbolConfiguration(pointSize: 17, weight: .medium))
+        sendButton.symbolConfiguration = NSImage.SymbolConfiguration(pointSize: 13, weight: .medium)
+            .applying(NSImage.SymbolConfiguration(paletteColors: [.labelColor]))
         sendButton.imagePosition = .imageOnly
         sendButton.target = self
         sendButton.action = #selector(submitMessage)
         sendButton.toolTip = "Send capture"
         sendButton.setAccessibilityLabel("Send image and message")
-        sendButton.wantsLayer = true
-        sendButton.layer?.cornerRadius = 10
-        sendButton.layer?.backgroundColor = NSColor.labelColor.withAlphaComponent(0.06).cgColor
         sendButton.imageScaling = .scaleProportionallyDown
         sendButton.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(sendButton)
@@ -134,10 +138,10 @@ final class PanelWindow: NSPanel, NSTextViewDelegate, NSWindowDelegate {
             scroll.topAnchor.constraint(equalTo: attachment.bottomAnchor, constant: 14),
             scroll.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
             scroll.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -64),
-            sendButton.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -14),
-            sendButton.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -12),
-            sendButton.widthAnchor.constraint(equalToConstant: 36),
-            sendButton.heightAnchor.constraint(equalToConstant: 36),
+            sendButton.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -16),
+            sendButton.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -16),
+            sendButton.widthAnchor.constraint(equalToConstant: 30),
+            sendButton.heightAnchor.constraint(equalToConstant: 30),
             targetDock.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
             targetDock.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -16),
             targetDock.heightAnchor.constraint(equalToConstant: 30),
