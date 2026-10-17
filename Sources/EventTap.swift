@@ -25,6 +25,7 @@ enum EventTap {
     static var isRunning: Bool { tap != nil }
 
     static func start() {
+        guard tap == nil, Permissions.hasAccessibility else { return }
         let types: [CGEventType] = [.leftMouseDown, .leftMouseDragged, .leftMouseUp,
                                    .rightMouseDown, .otherMouseDown, .scrollWheel,
                                    .mouseMoved, .keyDown, .keyUp]

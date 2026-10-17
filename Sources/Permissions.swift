@@ -7,12 +7,25 @@ import ApplicationServices
 /// with a dialog at login.
 enum Permissions {
 
+    static var accessibilityTitle: String {
+        if #available(macOS 27, *) { return "Device Control and Data Access" }
+        return "Accessibility"
+    }
+
     static var hasScreenRecording: Bool {
         CGPreflightScreenCaptureAccess()
     }
 
     static var hasAccessibility: Bool {
         AXIsProcessTrusted()
+    }
+
+    static var hasInputMonitoring: Bool { CGPreflightListenEventAccess() }
+    static var hasEventControl: Bool { CGPreflightPostEventAccess() }
+
+    static func requestInputMonitoring() {
+        CGRequestListenEventAccess()
+        openSettingsPane("Privacy_ListenEvent")
     }
 
     static var allGranted: Bool {

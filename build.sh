@@ -21,14 +21,25 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 APP="$ROOT/build/Lookit.app"
 SOURCES=("$ROOT"/Sources/*.swift)
 SWIFT_FLAGS=(-O -whole-module-optimization)
+BUNDLE_ID=local.lookit
 if [ "${1:-}" = "--tests" ]; then
   APP="$ROOT/build/tests/Lookit.app"
   SOURCES+=("$ROOT"/tests/*.swift)
   SWIFT_FLAGS+=(-D LOOKIT_TESTING)
+  BUNDLE_ID=local.lookit.tests
 fi
 SWIFTC="${LOOKIT_SWIFTC:-$(xcrun --find swiftc)}"
 TARGET="${LOOKIT_TARGET:-$(uname -m)-apple-macos26.0}"
 SIGN_ID="${LOOKIT_SIGN_ID:-Lookit Local Signing}"
+# Renaming the product does not require renaming its signing certificate. Reuse
+# the original identity on existing developer machines instead of losing TCC grants.
+if [ -z "${LOOKIT_SIGN_ID:-}" ]; then
+  IDENTITIES="$(security find-identity -v -p codesigning 2>/dev/null || true)"
+  if ! grep -qF '"Lookit Local Signing"' <<< "$IDENTITIES" \
+     && grep -qF '"DragShot Local Signing"' <<< "$IDENTITIES"; then
+    SIGN_ID="DragShot Local Signing"
+  fi
+fi
 
 if [ ! -x "$SWIFTC" ]; then
   echo "error: Swift compiler not found: $SWIFTC" >&2
@@ -98,6 +109,11 @@ echo "==> compiling (target $TARGET, SDK $SDK)"
 
 echo "==> bundling"
 cp "$ROOT/Info.plist" "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $BUNDLE_ID" "$APP/Contents/Info.plist"
+if [ "$BUNDLE_ID" = local.lookit.tests ]; then
+  /usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName Lookit Tests' "$APP/Contents/Info.plist"
+  /usr/libexec/PlistBuddy -c 'Set :CFBundleName Lookit Tests' "$APP/Contents/Info.plist"
+fi
 # Brand images and any other flat resources.
 if compgen -G "$ROOT/Sources/*.png" > /dev/null; then
   cp "$ROOT"/Sources/*.png "$APP/Contents/Resources/"
@@ -106,7 +122,7 @@ cp "$ROOT/assets/Lookit.icns" "$APP/Contents/Resources/Lookit.icns"
 
 echo "==> signing (identity: $SIGN_ID)"
 codesign --force --deep --sign "$SIGN_ID" \
-  --identifier local.lookit \
+  --identifier "$BUNDLE_ID" \
   "$APP" 2>&1 | sed 's/^/    /'
 
 echo "==> verifying"
@@ -115,7 +131,8 @@ codesign --verify --verbose=1 "$APP" 2>&1 | sed 's/^/    /'
 echo
 echo "built: $APP"
 echo
-echo "run:      open '$APP'                 # no debug trigger"
-echo "          open '$APP' --args --hotkey # also arms Command-Shift-4 as a trigger"
+echo "install:  ./install.sh (then open /Applications/Lookit.app)"
+echo "dev:      open '$APP' --args --development"
+echo "          open '$APP' --args --development --hotkey # also arms Command-Shift-4 as a trigger"
 echo "log:      tail -f ~/Library/Logs/Lookit.log"
 echo "captures: ~/Pictures/Lookit"

@@ -27,9 +27,16 @@ rm -rf "$DEST"
 cp -R "$SRC" "$DEST"
 codesign --verify "$DEST" 2>&1 | sed 's/^/    /'
 
+# Remove stale development registrations and make the installed path authoritative.
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+if [ -x "$LSREGISTER" ]; then
+  "$LSREGISTER" -u "$SRC" 2>/dev/null || true
+  "$LSREGISTER" -u "$ROOT/build/tests/Lookit.app" 2>/dev/null || true
+  "$LSREGISTER" -f "$DEST"
+fi
+defaults write local.lookit installedAppPath -string "$DEST"
 echo
 echo "installed: $DEST"
 echo "run:       open $DEST"
 echo
-echo "Grants are read at process start. If you just rebuilt, quit Lookit from its menu bar"
-echo "icon and reopen it, or the old grant stays in effect until it restarts."
+echo "Setup checks access live. If macOS requires a relaunch, use Restart Lookit in setup."

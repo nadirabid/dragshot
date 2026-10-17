@@ -137,7 +137,7 @@ Shortcuts while composing:
 - `/` opens it when the message is empty and the caret is at the start; the slash is consumed.
 - A slash after text remains literal.
 
-The menu bar menu can switch back to **Most recent** or **New chat**, which clears a pin.
+Settings → DeepSeek Harness can switch back to **Most recent** or **New chat**, which clears a pin.
 When DSH is disabled the target dock is hidden and Return behaves as a local-only capture.
 
 ### Architecture
@@ -177,7 +177,7 @@ sleep 2
 open -a "DeepSeek Harness"
 ```
 
-Then enable **Send captures to DSH** in Lookit's menu bar menu.
+Then enable **Send captures to DeepSeek Harness** in Settings → DeepSeek Harness.
 
 ### Known limits
 
@@ -212,8 +212,23 @@ change: `tccutil` still calls it `Accessibility`, and the settings URL is still
 `Privacy_Accessibility`. Screen Recording kept its name and lives in the same pane.
 
 Run and grant permissions to the signed app through LaunchServices (`open` or Finder). A binary
-launched directly from a shell can have a different permission context. Use the app's menu to
-check readiness; the event tap and trackpad reader must also be running.
+launched directly from a shell can have a different permission context. Use **Configure Permissions…** in the menu bar for the guided setup window. It opens once
+on an incomplete first launch, shows live permission and gesture status, opens the relevant
+System Settings panes, and supplies a draggable file reference to the running app bundle.
+Turn on Lookit in each list; if absent, drag the app tile into the list or add it with **+**.
+Status reports effective process access, not the visible Settings toggle. Input Monitoring
+is checked separately; a working event tap also satisfies that step without an additional grant.
+The **Already enabled?** button explains how to replace a stale entry after a signing change;
+it never changes privacy grants automatically. **Test Screen Capture** exercises the actual
+screenshot API with a tiny image that is immediately discarded. It allows up to a minute
+for the separate macOS consent dialog; a granted Settings toggle alone is not proof that
+a screenshot has succeeded.
+The guide moves to the side when opening Settings and includes **Restart Lookit** for grants
+macOS applies only after relaunch. No system permission prompt is raised until the user
+clicks a permission's **Open System Settings** button. Closing the guide does not prompt again at login.
+
+The Accessibility event listener attaches when a new grant is detected. The gesture and
+trackpad reader must also be working before the guide reports readiness.
 
 **A rebuild voids an ad-hoc signature's grants.** Ad-hoc signing has no identity, only a hash of
 the binary. The build therefore signs with a local certificate by default:
@@ -251,21 +266,28 @@ Requires macOS 26 or later. Tested on Apple silicon.
 
 ```sh
 ./build.sh
-open build/Lookit.app
+./install.sh
+open /Applications/Lookit.app
 ```
 
-The build uses the existing “Lookit Local Signing” certificate when available, verifies the
+The build uses the existing “Lookit Local Signing” certificate, or the original
+“DragShot Local Signing” certificate on renamed installations, verifies the
 signature, and reports success. `./install.sh` installs a copy in Applications (or `~/Applications` if
-`/Applications` is not writable); quit a running copy before switching between installed and
-development builds.
+`/Applications` is not writable). Opening a production build copy redirects to the installed
+app, or offers installation if none exists. Permission requests and setup drags therefore use
+the installed bundle. For intentional development-only runs, pass `--development`.
+Test builds use the separate `local.lookit.tests` bundle identity.
 
 Modes:
 
 ```sh
 build/Lookit.app/Contents/MacOS/Lookit --status
-build/Lookit.app/Contents/MacOS/Lookit --hotkey
-build/Lookit.app/Contents/MacOS/Lookit --request-permissions
+open /Applications/Lookit.app --args --hotkey
+open /Applications/Lookit.app --args --setup
 ```
+
+`--setup` (and the legacy `--request-permissions` alias) opens the guide without triggering
+system prompts.
 
 `--hotkey` also enables Command-Shift-4, then click and drag. The debug hotkey is consumed by
 Lookit when enabled. Normal launches leave the system shortcut alone.
@@ -346,3 +368,30 @@ contains no personal desktop data.
     tests/SelfTest.swift            geometry, event, and visual checks
     tests/E2E.swift                 system-event and capture integration checks
     tests/UITests.swift             dismissal, focus, multiline input, and material previews
+
+### App icon
+
+The app icon is the same SF Symbol (`crop`, regular weight) as the menu bar, drawn white
+on transparency. Regenerate every ICNS size with a matching Swift compiler/SDK:
+
+```sh
+xcrun swift -sdk /Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk -target arm64-apple-macos26.0 tools/generate-icon.swift build/Lookit.iconset
+iconutil -c icns build/Lookit.iconset -o assets/Lookit.icns
+cp build/Lookit.iconset/icon_512x512@2x.png assets/Lookit-icon.png
+```
+
+## Settings and login items
+
+The menu bar contains Settings, Configure Permissions, Launch at Login, and Quit. The single
+Settings window uses a SwiftUI navigation sidebar with General, Permissions, and DeepSeek Harness. General holds
+local capture and diagnostic actions; the integration page holds sending, default
+destination, activation, and connection status. Existing preferences are preserved.
+
+Launch at login uses `SMAppService.mainApp`. Both controls read the system status,
+including pending approval, rather than storing a separate boolean. Login items
+start Lookit when the user logs in, without opening Settings when setup is complete.
+
+The window contents use SwiftUI `NavigationSplitView` and grouped `Form` sections.
+`SettingsModel` owns observable state and forwards actions to the existing services;
+`SettingsWindow` handles the accessory application's window lifecycle. `AppDragView`
+is the small AppKit bridge for native file dragging from an inactive window.

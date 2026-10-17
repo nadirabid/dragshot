@@ -37,6 +37,8 @@ enum Diagnostics {
         updated: \(ISO8601DateFormatter().string(from: Date()))
         screen recording: \(Permissions.hasScreenRecording)
         accessibility: \(Permissions.hasAccessibility)
+        input monitoring: \(Permissions.hasInputMonitoring)
+        event control: \(Permissions.hasEventControl)
         event tap: \(EventTap.isRunning)
         multitouch: \(Multitouch.isAvailable)
         three-finger drag: \(threeFingerDrag)
@@ -62,7 +64,7 @@ enum Diagnostics {
 
     static func openTrackpadSettings() {
         NSWorkspace.shared.open(
-            URL(string: "x-apple.systempreferences:com.apple.preference.universalaccess")!
+            URL(string: "x-apple.systempreferences:com.apple.preference.universalaccess?Mouse")!
         )
     }
 }

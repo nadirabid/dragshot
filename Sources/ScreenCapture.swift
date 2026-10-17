@@ -15,7 +15,7 @@ enum CaptureError: LocalizedError {
 enum ScreenCapture {
     /// Both the timeout and asynchronous result finish on the main actor, exactly once.
     /// Cancellation and the controller's generation check prevent stale UI from reopening.
-    static func capture(screen: NSScreen, rect: NSRect,
+    static func capture(screen: NSScreen, rect: NSRect, timeoutInterval: TimeInterval = 4,
                         completion: @escaping (Result<CGImage, Error>) -> Void) -> Task<Void, Never> {
         var completed = false
         func finish(_ result: Result<CGImage, Error>) {
@@ -24,7 +24,7 @@ enum ScreenCapture {
             completion(result)
         }
         let timeout = DispatchWorkItem { finish(.failure(CaptureError.timedOut)) }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 4, execute: timeout)
+        DispatchQueue.main.asyncAfter(deadline: .now() + timeoutInterval, execute: timeout)
 
         return Task { @MainActor in
             defer { timeout.cancel() }

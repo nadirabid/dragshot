@@ -2,23 +2,31 @@ import Cocoa
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
+    private var setupWindow: SettingsWindow?
+    private var permissionTimer: Timer?
+    private var lastSetupStatus: SetupStatus?
+    private var lastLoginStatus: Int?
     #if LOOKIT_TESTING
     var runE2EOnLaunch = false
     #endif
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        guard AppLocation.prepareLaunch() else { return }
         buildStatusItem()
         Lookit.shared.start()
         Diagnostics.write()
         Log.write("three-finger drag setting: \(Diagnostics.threeFingerDrag)")
 
-        // Used once, on first run, to raise the two grants. Never automatic: launching the app
-        // at login should not produce dialogs.
-        if CommandLine.arguments.contains("--request-permissions") {
-            if !Permissions.hasScreenRecording { Permissions.requestScreenRecording() }
-            if !Permissions.hasAccessibility { Permissions.requestAccessibility() }
-            scheduleMenuRefresh()
+        // Present guidance once when setup is incomplete, without raising system prompts.
+        let explicitSetup = CommandLine.arguments.contains("--request-permissions")
+            || CommandLine.arguments.contains("--setup")
+        if explicitSetup || (!SetupStatus.current.ready
+                             && !UserDefaults.standard.bool(forKey: "didShowSetup")) {
+            showSetup()
+        }
+        permissionTimer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+            self?.updatePermissionState()
         }
 
         #if LOOKIT_TESTING
@@ -26,7 +34,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #endif
     }
 
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showSettings()
+        return true
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
+        permissionTimer?.invalidate()
         Lookit.shared.cancel()
     }
 
@@ -43,246 +57,80 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         refreshMenu()
     }
 
-    /// The menu states permission status plainly rather than nagging with dialogs at launch.
     func refreshMenu() {
         let menu = NSMenu()
-
-        let header = NSMenuItem(title: "Lookit", action: nil, keyEquivalent: "")
-        header.isEnabled = false
-        menu.addItem(header)
+        let settings = NSMenuItem(title: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
+        settings.target = self
+        menu.addItem(settings)
+        let permissions = NSMenuItem(title: "Configure Permissions…", action: #selector(showSetup), keyEquivalent: "")
+        permissions.target = self
+        menu.addItem(permissions)
+        let login = NSMenuItem(title: "Launch at Login", action: #selector(toggleLogin), keyEquivalent: "")
+        login.target = self
+        login.state = LaunchAtLogin.enabled ? .on : LaunchAtLogin.needsApproval ? .mixed : .off
+        menu.addItem(login)
         menu.addItem(.separator())
-
-        let threeFinger = NSMenuItem(
-            title: "Three-finger drag: draw a box to capture",
-            action: nil, keyEquivalent: "")
-        threeFinger.isEnabled = false
-        menu.addItem(threeFinger)
-
-        let dragStatus = NSMenuItem(
-            title: "Three-finger drag setting: \(Diagnostics.threeFingerDrag)",
-            action: nil, keyEquivalent: "")
-        dragStatus.isEnabled = false
-        menu.addItem(dragStatus)
-        menu.addItem(NSMenuItem(title: "Open Trackpad Settings…",
-                                action: #selector(openTrackpadSettings), keyEquivalent: ""))
-
-        if Lookit.shared.hotkeyEnabled {
-            let hotkey = NSMenuItem(title: "Debug trigger: ⌘⇧4", action: nil, keyEquivalent: "")
-            hotkey.isEnabled = false
-            menu.addItem(hotkey)
-        }
-
-        let multitouch = NSMenuItem(
-            title: "Trackpad reader: \(Multitouch.isAvailable ? "running" : "unavailable")",
-            action: nil, keyEquivalent: "")
-        multitouch.isEnabled = false
-        menu.addItem(multitouch)
-
-        let eventTap = NSMenuItem(
-            title: "Event tap: \(EventTap.isRunning ? "running" : "unavailable")",
-            action: nil, keyEquivalent: "")
-        eventTap.isEnabled = false
-        menu.addItem(eventTap)
-
-        menu.addItem(.separator())
-
-        if Permissions.hasScreenRecording {
-            let ok = NSMenuItem(title: "✓ Screen Recording", action: nil, keyEquivalent: "")
-            ok.isEnabled = false
-            menu.addItem(ok)
-        } else {
-            menu.addItem(NSMenuItem(title: "Grant Screen Recording…",
-                                    action: #selector(grantScreenRecording),
-                                    keyEquivalent: ""))
-        }
-
-        if Permissions.hasAccessibility {
-            let ok = NSMenuItem(title: "✓ Accessibility", action: nil, keyEquivalent: "")
-            ok.isEnabled = false
-            menu.addItem(ok)
-        } else {
-            menu.addItem(NSMenuItem(title: "Grant Accessibility…",
-                                    action: #selector(grantAccessibility),
-                                    keyEquivalent: ""))
-        }
-
-        if Permissions.allGranted && EventTap.isRunning && Multitouch.isAvailable {
-            let ready = NSMenuItem(title: "✓ Ready", action: nil, keyEquivalent: "")
-            ready.isEnabled = false
-            menu.addItem(ready)
-        }
-
-        menu.addItem(.separator())
-        addAgentItems(to: menu)
-
-        menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Open Captures Folder",
-                                action: #selector(openFolder), keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "Reveal Log",
-                                action: #selector(revealLog), keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "Copy Diagnostics",
-                                action: #selector(copyDiagnostics), keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "Reveal Diagnostics",
-                                action: #selector(revealDiagnostics), keyEquivalent: ""))
-        menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Quit Lookit",
-                                action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
-
-        wireMenuTargets(menu)
-        // Quit keeps the standard target.
-        menu.items.last?.target = NSApp
-
+        let quit = NSMenuItem(title: "Quit Lookit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        quit.target = NSApp
+        menu.addItem(quit)
         statusItem?.menu = menu
         Diagnostics.write()
     }
 
-    /// The agent controls live beside the permission state, not in a second
-    /// menu. A real settings window can grow from this without changing the
-    /// defaults the capture path reads.
-    private func addAgentItems(to menu: NSMenu) {
-        let integration = DSHIntegration.shared
-
-        let send = NSMenuItem(title: "Send captures to DSH",
-                              action: #selector(toggleDSH), keyEquivalent: "")
-        send.state = integration.isEnabled ? .on : .off
-        menu.addItem(send)
-
-        let targetItem = NSMenuItem(title: "DSH target", action: nil, keyEquivalent: "")
-        let targetMenu = NSMenu(title: "DSH target")
-        let recent = NSMenuItem(title: "Most recent session",
-                                action: #selector(useRecentDSHTarget), keyEquivalent: "")
-        recent.state = integration.target == .recent ? .on : .off
-        let fresh = NSMenuItem(title: "New chat",
-                               action: #selector(useNewDSHTarget), keyEquivalent: "")
-        fresh.state = integration.target == .new ? .on : .off
-        targetMenu.addItem(recent)
-        targetMenu.addItem(fresh)
-        if case .session(_, let title) = integration.target {
-            let pinned = NSMenuItem(title: "Pinned: \(title)", action: nil, keyEquivalent: "")
-            pinned.state = .on
-            pinned.isEnabled = false
-            targetMenu.addItem(.separator())
-            targetMenu.addItem(pinned)
-        }
-        targetItem.submenu = targetMenu
-        targetItem.isEnabled = integration.isEnabled
-        menu.addItem(targetItem)
-
-        let activate = NSMenuItem(title: "Open DSH after send",
-                                  action: #selector(toggleDSHActivation), keyEquivalent: "")
-        activate.state = integration.activateAfterSend ? .on : .off
-        activate.isEnabled = integration.isEnabled
-        menu.addItem(activate)
-
-        let status = NSMenuItem(title: "DSH bridge: \(integration.bridgeStatusText)",
-                                action: nil, keyEquivalent: "")
-        status.isEnabled = false
-        menu.addItem(status)
-
-        menu.addItem(NSMenuItem(title: "Open DSH",
-                                action: #selector(openDSH), keyEquivalent: ""))
-    }
-
-    /// Actions in submenus need the same target wiring as top-level items.
-    private func wireMenuTargets(_ menu: NSMenu) {
-        for item in menu.items {
-            if let submenu = item.submenu { wireMenuTargets(submenu) }
-            if item.action != nil && item.target == nil { item.target = self }
-        }
-    }
-
-    @objc private func toggleDSH() {
-        let integration = DSHIntegration.shared
-        integration.isEnabled.toggle()
-        if integration.isEnabled {
-            switch integration.bridgeState {
-            case .ready:
-                break
-            case .appNotRunning:
-                Notice.show("DSH will open on the first capture.")
-            case .bridgeMissing:
-                Notice.show("DSH bridge is not loaded. Restart DSH once.")
-            case .notInstalled:
-                Notice.show("DeepSeek Harness is not installed.")
-            }
-        }
+    @objc private func toggleLogin() {
+        LaunchAtLogin.toggle()
         refreshMenu()
+        setupWindow?.refreshPreferences()
     }
 
-    @objc private func useRecentDSHTarget() {
-        DSHIntegration.shared.target = .recent
-        refreshMenu()
-    }
+    @objc private func showSettings() { presentSettings(page: nil) }
+    @objc private func showSetup() { presentSettings(page: .permissions) }
 
-    @objc private func useNewDSHTarget() {
-        DSHIntegration.shared.target = .new
-        refreshMenu()
-    }
-
-    @objc private func toggleDSHActivation() {
-        DSHIntegration.shared.activateAfterSend.toggle()
-        refreshMenu()
-    }
-
-    @objc private func openDSH() {
-        if !DSHIntegration.shared.openDSH() {
-            Notice.show("DeepSeek Harness is not installed.")
+    private func presentSettings(page: SettingsPage?) {
+        Lookit.shared.cancel()
+        if setupWindow == nil {
+            setupWindow = SettingsWindow()
+            Lookit.shared.setupWindow = setupWindow?.window
+            setupWindow?.onChange = { [weak self] in self?.refreshMenu() }
+            setupWindow?.onRestart = { [weak self] in self?.restartApp() }
         }
-        refreshMenu()
+        UserDefaults.standard.set(true, forKey: "didShowSetup")
+        if let page { setupWindow?.selectPage(page) }
+        setupWindow?.present()
     }
 
-    @objc private func grantScreenRecording() {
-        Permissions.requestScreenRecording()
-        scheduleMenuRefresh()
-    }
-
-    @objc private func grantAccessibility() {
-        Permissions.requestAccessibility()
-        scheduleMenuRefresh()
-    }
-
-    @objc private func openFolder() {
-        try? FileManager.default.createDirectory(atPath: Storage.directory, withIntermediateDirectories: true)
-        NSWorkspace.shared.open(URL(fileURLWithPath: Storage.directory))
-    }
-
-    @objc private func revealLog() {
-        let url = URL(fileURLWithPath: Log.path)
-        if FileManager.default.fileExists(atPath: Log.path) {
-            NSWorkspace.shared.activateFileViewerSelecting([url])
-        } else {
-            NSWorkspace.shared.open(url.deletingLastPathComponent())
-        }
-    }
-
-    @objc private func openTrackpadSettings() {
-        Diagnostics.openTrackpadSettings()
-    }
-
-    @objc private func copyDiagnostics() {
-        Diagnostics.write()
-        Diagnostics.copyToPasteboard()
-        Notice.show("Diagnostics copied.")
-    }
-
-    @objc private func revealDiagnostics() {
-        Diagnostics.write()
-        let url = URL(fileURLWithPath: Diagnostics.path)
-        if FileManager.default.fileExists(atPath: Diagnostics.path) {
-            NSWorkspace.shared.activateFileViewerSelecting([url])
-        } else {
-            NSWorkspace.shared.open(url.deletingLastPathComponent())
-        }
-    }
-
-    /// Permissions are granted in System Settings, so poll briefly to catch the flip.
-    private func scheduleMenuRefresh() {
-        for delay in [1.0, 4.0, 10.0] {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                self?.refreshMenu()
+    private func restartApp() {
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.createsNewApplicationInstance = true
+        configuration.arguments = ["--setup"] + (Lookit.shared.hotkeyEnabled ? ["--hotkey"] : [])
+        NSWorkspace.shared.openApplication(at: Bundle.main.bundleURL, configuration: configuration) {
+            [weak self] application, error in
+            DispatchQueue.main.async {
+                if application != nil && error == nil { NSApp.terminate(nil) }
+                else { self?.setupWindow?.showRestartError() }
             }
         }
     }
+
+    private func updatePermissionState() {
+        // Attach once after the user grants access; never rebuild the whole capture controller.
+        let status = SetupStatus.current
+        if status.accessibility && !status.listener && (lastSetupStatus?.accessibility != true || lastSetupStatus?.inputMonitoring != status.inputMonitoring) {
+            EventTap.start()
+        }
+        setupWindow?.refreshPreferences()
+        if lastLoginStatus != LaunchAtLogin.status.rawValue {
+            lastLoginStatus = LaunchAtLogin.status.rawValue
+            refreshMenu()
+        }
+        let updated = SetupStatus.current
+        if updated != lastSetupStatus {
+            lastSetupStatus = updated
+            refreshMenu()
+            setupWindow?.refresh(updated)
+        }
+    }
+
 }
 
 // MARK: - Entry point

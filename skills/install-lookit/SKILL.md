@@ -79,7 +79,19 @@ The script reads the file written by the running app:
 Do not treat the install as verified until these pass and the user has made a
 physical test capture.
 
-If a check fails, fix them in this order and rerun the script:
+If a check fails, open Lookit's guided setup first:
+
+```sh
+open /Applications/Lookit.app --args --setup
+```
+
+If Lookit is already running, use **Configure Permissions…** in its menu instead. The guide
+shows live status, opens the relevant Settings pane, and provides a draggable app tile for
+adding the installed Lookit app to the list. Input Monitoring is checked separately; a working
+event tap satisfies that step without an extra grant. Always launch the installed copy, not
+the build directory. Use its **Restart Lookit** button if macOS requires a relaunch.
+
+For manual diagnosis, fix checks in this order and rerun the script:
 
 1. **Screen Recording is false.** Open System Settings → Privacy & Security →
    Screen Recording, enable Lookit, then quit and reopen Lookit.
@@ -88,12 +100,12 @@ If a check fails, fix them in this order and rerun the script:
    ```
 2. **Accessibility is false.** Open System Settings → Privacy & Security →
    Accessibility. On macOS 27 this is **Device Control and Data Access**. Enable
-   Lookit, then quit and reopen it; the event tap is installed only at launch.
+   Lookit, then quit and reopen it; the event tap attaches when the new grant is detected.
    ```sh
    open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
    ```
-3. **Event tap is false while both grants are true.** Quit and reopen Lookit
-   once. If it is still false, use **Copy Diagnostics** in Lookit's menu and
+3. **Event tap is false while both grants are true.** Check Input Monitoring in
+   the setup guide, then quit and reopen Lookit once. If it is still false, use **Copy Diagnostics** in Lookit's menu and
    check `~/Library/Logs/Lookit.log`; do not guess.
 4. **Three-finger drag setting is disabled or unknown.** System Settings →
    Accessibility → Pointer Control → Trackpad Options → Use trackpad for
@@ -101,7 +113,7 @@ If a check fails, fix them in this order and rerun the script:
    reads the raw trackpad contacts and needs the event tap for the gesture.
    Quit and reopen Lookit after changing it.
    ```sh
-   open "x-apple.systempreferences:com.apple.preference.universalaccess"
+   open "x-apple.systempreferences:com.apple.preference.universalaccess?Mouse"
    ```
 5. **Trackpad reader is unavailable.** Check the log and copy diagnostics. Do
    not promise three-finger capture; report the failure plainly.
@@ -109,11 +121,12 @@ If a check fails, fix them in this order and rerun the script:
    installer from `"$REPO/dsh-lookit/install.sh"`. The app still captures
    locally while the bridge is absent.
 
-The app's menu also shows the same permission, event-tap, Trackpad, and
-three-finger state, opens the trackpad settings, and offers **Copy
-Diagnostics**, **Reveal Diagnostics**, and **Reveal Log**. The explicit
-`--request-permissions` launch argument raises the two system permission
-prompts; do not use it automatically at login.
+The Settings window shows permission and gesture status under **Permissions**.
+**General** includes launch at login, the captures folder, **Copy Diagnostics**,
+**Reveal Diagnostics**, **Reveal Log**, and Quit. The menu bar contains only
+Settings, Configure Permissions, Launch at Login, and Quit. The explicit
+`--request-permissions` launch argument opens the setup guide without raising
+system permission prompts.
 
 ## Physical test
 

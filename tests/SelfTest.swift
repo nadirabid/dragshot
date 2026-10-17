@@ -33,6 +33,7 @@ enum SelfTest {
         panelRendering()
         pickerRendering()
         pickerTrigger()
+        setupRendering()
         print("PASS: coordinates, event suppression, Escape, transparent rendering at 1x/2x, live view, panel, picker, slash trigger")
         print("Visual evidence: \(output.path)")
     }
@@ -250,5 +251,82 @@ enum SelfTest {
         view.cacheDisplay(in: view.bounds, to: rep)
         write(rep.cgImage!, name: "picker.png")
         picker.orderOut(nil)
+    }
+
+    private static func setupRendering() {
+        let setup = SettingsWindow()
+        let integration = DSHIntegration.shared
+        let originalTarget = integration.target
+        let originalSending = integration.isEnabled
+        let originalActivation = integration.activateAfterSend
+        defer {
+            integration.target = originalTarget
+            integration.isEnabled = originalSending
+            integration.activateAfterSend = originalActivation
+        }
+        let model = setup.model
+        model.setDestination("new")
+        require(integration.target == .new && model.destination == "new", "SwiftUI destination updates the capture service")
+        integration.target = .session(id: "test-pinned", title: "Pinned test chat")
+        model.refreshPreferences()
+        require(model.destination == "session" && model.destinationTitle == "Pinned test chat", "settings observes a destination chosen by the composer")
+        model.setDestination("recent")
+        model.setSending(false)
+        model.setActivation(false)
+        require(!integration.isEnabled && !integration.activateAfterSend, "SwiftUI toggles use existing preferences")
+        model.setSending(originalSending)
+        model.setActivation(originalActivation)
+        integration.target = originalTarget
+        model.refreshPreferences()
+        let ready = SetupStatus(screen: true, accessibility: true, gesture: true,
+                                listener: true, trackpad: true, inputMonitoring: true)
+        var noListener = ready
+        noListener.listener = false
+        require(!noListener.ready && noListener.summary.contains("Restart"),
+                "allowed permissions without a listener must explain restart")
+        var noTrackpad = ready
+        noTrackpad.trackpad = false
+        require(!noTrackpad.ready && noTrackpad.summary.contains("trackpad"),
+                "an unavailable trackpad must not be reported as ready")
+        require(AppLocation.isInstalled(URL(fileURLWithPath: "/Applications/Lookit.app")), "Applications copy is installed")
+        require(!AppLocation.isInstalled(URL(fileURLWithPath: "/tmp/build/Lookit.app")), "build copy is not installed")
+        var inputCovered = ready
+        inputCovered.inputMonitoring = false
+        require(inputCovered.ready, "a working filtering tap must not demand another input grant")
+        inputCovered.listener = false
+        require(!inputCovered.ready, "missing input access must not report ready")
+        let url = URL(fileURLWithPath: "/Applications/Lookit.app")
+        let tile = AppDragView(appURL: url)
+        let board = NSPasteboard.withUniqueName()
+        defer { board.releaseGlobally() }
+        require(board.writeObjects([tile.appURL as NSURL]), "the app drag must write a file URL")
+        require((board.readObjects(forClasses: [NSURL.self])?.first as? URL) == url,
+                "Settings must receive the app bundle URL, not its executable or an image")
+        let states = [
+            ("missing", SetupStatus(screen: false, accessibility: false, gesture: false,
+                                    listener: false, trackpad: true)),
+            ("restart", noListener), ("ready", ready)
+        ]
+        func render(_ name: String) {
+            let view = setup.window!.contentView!
+            RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+            view.layoutSubtreeIfNeeded()
+            let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
+            view.cacheDisplay(in: view.bounds, to: rep)
+            write(rep.cgImage!, name: name)
+        }
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            setup.window?.appearance = NSAppearance(named: appearance)
+            setup.selectPage(.permissions)
+            for (name, status) in states {
+                setup.refresh(status)
+                render("setup-\(name)-\(appearance.rawValue).png")
+            }
+            for page in [SettingsPage.general, .integration] {
+                setup.selectPage(page)
+                render("settings-\(page.rawValue)-\(appearance.rawValue).png")
+            }
+        }
+        setup.close()
     }
 }

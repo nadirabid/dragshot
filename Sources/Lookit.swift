@@ -18,6 +18,7 @@ final class Lookit {
     private var generation = 0
     private var workspaceObservers: [NSObjectProtocol] = []
     var hotkeyEnabled = false
+    weak var setupWindow: NSWindow?
 
     private init() {}
 
@@ -26,6 +27,9 @@ final class Lookit {
         EventTap.hotkeyEnabled = hotkeyEnabled
         EventTap.canBegin = { [weak self] in
             guard let self else { return false }
+            if AppDragView.isDragging { return false }
+            if let setup = self.setupWindow, setup.isVisible,
+               setup.frame.contains(NSEvent.mouseLocation) { return false }
             return self.state == .idle && Permissions.hasScreenRecording
         }
         EventTap.onBegin = { [weak self] in self?.begin(at: $0) }
@@ -100,7 +104,7 @@ final class Lookit {
         guard Permissions.hasScreenRecording,
               let screen = NSScreen.screens.first(where: { NSMouseInRect(point, $0.frame, false) }) else {
             reset()
-            Notice.show("Lookit needs Screen Recording — grant it from the menu bar")
+            Notice.show("Lookit needs Screen Recording — open Setup & Permissions from the menu bar")
             return
         }
         generation += 1
