@@ -220,8 +220,8 @@ enum SelfTest {
         defer { DSHIntegration.shared.isEnabled = previous }
         let panel = PanelWindow()
         panel.present(near: NSRect(x: 200, y: 400, width: 400, height: 200), on: NSScreen.main!)
-        panel.testTypeSlash()
-        require(panel.testPickerVisible, "a leading slash opens the session picker")
+        panel.testTypeSlashAsKeyEvent()
+        require(panel.testPickerVisible, "a leading slash key event opens the session picker")
         panel.dismissSessionPicker()
         require(panel.testEditorFocused, "closing the picker returns focus to the message field")
         panel.orderOut(nil)

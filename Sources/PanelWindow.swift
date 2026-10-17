@@ -331,6 +331,24 @@ final class PanelWindow: NSPanel, NSTextViewDelegate, NSWindowDelegate {
         textView.insertText("/", replacementRange: NSRange(location: 0, length: 0))
     }
 
+    func testTypeSlashAsKeyEvent() {
+        let timestamp = ProcessInfo.processInfo.systemUptime
+        if let down = NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: [], timestamp: timestamp,
+            windowNumber: windowNumber, context: nil, characters: "/",
+            charactersIgnoringModifiers: "/", isARepeat: false, keyCode: 44
+        ) {
+            sendEvent(down)
+        }
+        if let up = NSEvent.keyEvent(
+            with: .keyUp, location: .zero, modifierFlags: [], timestamp: timestamp,
+            windowNumber: windowNumber, context: nil, characters: "/",
+            charactersIgnoringModifiers: "/", isARepeat: false, keyCode: 44
+        ) {
+            sendEvent(up)
+        }
+    }
+
     func setDraftForTesting(_ text: String) {
         textView.string = text
         textView.setSelectedRange(NSRange(location: (text as NSString).length, length: 0))
@@ -342,11 +360,10 @@ final class PanelWindow: NSPanel, NSTextViewDelegate, NSWindowDelegate {
         if !isClearingSlash,
            DSHIntegration.shared.isEnabled,
            sessionPicker == nil,
-           !textView.hasMarkedText(),
-           textView.string == "/",
-           textView.selectedRange().location == 1 {
-            // DSH-style command entry: a leading slash opens the picker and is
-            // consumed. A slash after text remains literal.
+           textView.string == "/" {
+            // DSH-style command entry: the whole empty message is now a slash.
+            // Don't depend on the field editor's selection timing: some input
+            // paths deliver textDidChange before the caret settles at 1.
             isClearingSlash = true
             textView.string = ""
             textView.setSelectedRange(NSRange(location: 0, length: 0))

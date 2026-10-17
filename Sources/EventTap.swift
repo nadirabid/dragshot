@@ -66,7 +66,15 @@ enum EventTap {
             if type == .keyUp {
                 return swallowedKeys.remove(key) == nil ? Unmanaged.passUnretained(event) : nil
             }
-            if swallowedKeys.contains(key) { return nil }
+            if swallowedKeys.contains(key) {
+                // A missing key-up for a swallowed shortcut must not eat the
+                // same key forever. A plain slash is always allowed through.
+                if key == 44, !event.flags.contains(.maskCommand) {
+                    swallowedKeys.remove(key)
+                    return Unmanaged.passUnretained(event)
+                }
+                return nil
+            }
             if key == 53, onCancel() {
                 cancelled = dragging
                 aiming = false
