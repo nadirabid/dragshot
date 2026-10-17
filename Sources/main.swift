@@ -254,6 +254,16 @@ if CommandLine.arguments.contains("--status") {
 }
 
 #if DRAGSHOT_TESTING
+// Clean README capture: the real AppKit glass UI, fake session data, and a
+// caller-supplied macOS wallpaper. No personal desktop content is included.
+if let index = CommandLine.arguments.firstIndex(of: "--readme-shot"),
+   CommandLine.arguments.indices.contains(index + 1) {
+    app.setActivationPolicy(.accessory)
+    app.finishLaunching()
+    ReadmeShot.run(backgroundPath: CommandLine.arguments[index + 1])
+    app.run()
+}
+
 // Visual review path for the composer + picker. It uses the real DSH bridge
 // when available and captures the views directly, without ScreenCaptureKit.
 if CommandLine.arguments.contains("--picker-review") {

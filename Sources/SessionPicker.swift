@@ -215,9 +215,15 @@ final class SessionPickerWindow: NSPanel, NSTextFieldDelegate {
     private var errorText: String?
     private var query = ""
     private var anchor = NSRect.zero
+    private var panelFrame = NSRect.zero
     private var anchorScreen: NSScreen?
     private var isDismissing = false
     private var hasPresented = false
+
+#if DRAGSHOT_TESTING
+    /// Test-only session list used by the clean README screenshot mode.
+    static var testSessions: [DSHSession]?
+#endif
 
     private let panelWidth: CGFloat = 340
     private let rowHeight: CGFloat = 40
@@ -245,12 +251,16 @@ final class SessionPickerWindow: NSPanel, NSTextFieldDelegate {
         surface.layer?.borderWidth = 1
         surface.layer?.borderColor = NSColor.white.withAlphaComponent(0.45).cgColor
 
+        let backing = GlassTintView(tintAlpha: 0.50, borderAlpha: 0, cornerRadius: 18)
+        backing.frame = surface.bounds
+        backing.autoresizingMask = [.width, .height]
+        surface.addSubview(backing)
         let glass = NSGlassEffectView(frame: surface.bounds)
         glass.autoresizingMask = [.width, .height]
         glass.style = .regular
         glass.cornerRadius = 18
-        let content = NSView()
-        content.wantsLayer = true
+        glass.tintColor = GlassPalette.whiteTint(light: 0.80, dark: 0.20)
+        let content = GlassTintView(tintAlpha: 0.20, borderAlpha: 0.65, cornerRadius: 18)
         glass.contentView = content
         surface.addSubview(glass)
         contentView = surface
@@ -405,11 +415,19 @@ final class SessionPickerWindow: NSPanel, NSTextFieldDelegate {
 
     /// Show above the anchor (the bottom dock chip). If there is not enough
     /// room, show below it, clamped to the screen.
-    func present(above anchor: NSRect, on screen: NSScreen?) {
+    func present(above anchor: NSRect, on screen: NSScreen?, panelFrame: NSRect = .zero) {
         guard !hasPresented else { return }
         hasPresented = true
         self.anchor = anchor
+        self.panelFrame = panelFrame
         anchorScreen = screen ?? NSScreen.main
+#if DRAGSHOT_TESTING
+        if let testSessions = Self.testSessions {
+            sessions = testSessions
+            loading = false
+            errorText = nil
+        }
+#endif
         rebuildRows(resetSelection: true)
         positionWindow()
         makeKeyAndOrderFront(nil)
@@ -417,7 +435,11 @@ final class SessionPickerWindow: NSPanel, NSTextFieldDelegate {
             guard let self else { return }
             self.makeFirstResponder(self.searchField)
         }
+#if DRAGSHOT_TESTING
+        if Self.testSessions == nil { loadSessions() }
+#else
         loadSessions()
+#endif
     }
 
     /// Test hook. The self-test can drive the picker without DSH.
@@ -670,13 +692,33 @@ final class SessionPickerWindow: NSPanel, NSTextFieldDelegate {
         let screen = anchorScreen ?? NSScreen.main
         guard let visible = screen?.visibleFrame else { return }
         let height = frame.height
+        let gap: CGFloat = 12
+        let topLimit = visible.maxY - 12
+        let bottomLimit = visible.minY + 12
+
+        // B layout: the picker sits beside the composer, bottom-aligned when
+        // possible. Fall back to above/below the target chip on narrow screens.
+        if panelFrame != .zero {
+            let y = max(bottomLimit, min(panelFrame.minY, topLimit - height))
+            let rightX = panelFrame.maxX + gap
+            if rightX + panelWidth <= visible.maxX - 12 {
+                setFrame(NSRect(x: rightX, y: y, width: panelWidth, height: height), display: true)
+                return
+            }
+            let leftX = panelFrame.minX - panelWidth - gap
+            if leftX >= visible.minX + 12 {
+                setFrame(NSRect(x: leftX, y: y, width: panelWidth, height: height), display: true)
+                return
+            }
+        }
+
         var x = anchor.minX
         x = min(max(x, visible.minX + 12), visible.maxX - panelWidth - 12)
         var y = anchor.maxY + 8
-        if y + height > visible.maxY - 12 {
+        if y + height > topLimit {
             y = anchor.minY - height - 8
         }
-        y = max(visible.minY + 12, y)
+        y = max(bottomLimit, y)
         let target = NSRect(x: x, y: y, width: panelWidth, height: height)
         if frame != target { setFrame(target, display: true) }
     }

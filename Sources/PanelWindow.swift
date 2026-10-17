@@ -44,12 +44,16 @@ final class PanelWindow: NSPanel, NSTextViewDelegate, NSWindowDelegate {
 
         let surface = InputSurface(frame: NSRect(x: 0, y: 0, width: 480, height: 68))
         surface.wantsLayer = true
+        let backing = GlassTintView(tintAlpha: 0.55, borderAlpha: 0, cornerRadius: 22)
+        backing.frame = surface.bounds
+        backing.autoresizingMask = [.width, .height]
+        surface.addSubview(backing)
         let glass = NSGlassEffectView(frame: surface.bounds)
         glass.autoresizingMask = [.width, .height]
         glass.style = .regular
         glass.cornerRadius = 22
-        let content = NSView()
-        content.wantsLayer = true
+        glass.tintColor = GlassPalette.whiteTint(light: 0.78, dark: 0.18)
+        let content = GlassTintView(tintAlpha: 0.78, borderAlpha: 0.70, cornerRadius: 22)
         glass.contentView = content
         surface.addSubview(glass)
         contentView = surface
@@ -285,7 +289,7 @@ final class PanelWindow: NSPanel, NSTextViewDelegate, NSWindowDelegate {
         sessionPicker = picker
         let anchor = targetChip.window?.convertToScreen(targetChip.convert(targetChip.bounds, to: nil))
             ?? NSRect(x: frame.midX, y: frame.minY, width: 1, height: 1)
-        picker.present(above: anchor, on: screen ?? placementScreen)
+        picker.present(above: anchor, on: screen ?? placementScreen, panelFrame: frame)
         Log.write("session picker opened")
     }
 
@@ -321,6 +325,12 @@ final class PanelWindow: NSPanel, NSTextViewDelegate, NSWindowDelegate {
 
     func testTypeSlash() {
         textView.insertText("/", replacementRange: NSRange(location: 0, length: 0))
+    }
+
+    func setDraftForTesting(_ text: String) {
+        textView.string = text
+        textView.setSelectedRange(NSRange(location: (text as NSString).length, length: 0))
+        resizeToFit()
     }
 #endif
 
