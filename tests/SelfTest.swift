@@ -2,7 +2,7 @@ import Cocoa
 
 enum SelfTest {
     static let output = URL(fileURLWithPath: NSTemporaryDirectory())
-        .appendingPathComponent("dragshot-ux-tests", isDirectory: true)
+        .appendingPathComponent("lookit-ux-tests", isDirectory: true)
 
     static func require(_ condition: @autoclosure () -> Bool, _ message: String) {
         guard condition() else {

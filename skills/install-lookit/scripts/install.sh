@@ -1,5 +1,5 @@
 #!/bin/bash
-# Install DragShot and its DSH bridge from this repository.
+# Install Lookit and its DSH bridge from this repository.
 #
 # This is intentionally a thin wrapper around the app's build/install scripts and
 # the bridge installer. It is safe to rerun after a git pull to upgrade.
@@ -10,7 +10,7 @@ usage() {
 usage: install.sh [--workspace DIR] [--repo DIR]
 
   --workspace DIR  default cwd for new DSH sessions (default: current directory)
-  --repo DIR       DragShot checkout (default: resolved from this skill's path)
+  --repo DIR       Lookit checkout (default: resolved from this skill's path)
 EOF
 }
 
@@ -40,13 +40,13 @@ if [ -z "$REPO" ]; then
 fi
 
 if [ ! -x "$REPO/build.sh" ] || [ ! -x "$REPO/install.sh" ] \
-   || [ ! -x "$REPO/dsh-dragshot/install.sh" ]; then
-  echo "error: $REPO does not look like a DragShot checkout" >&2
-  echo "       pass --repo /path/to/dragshot" >&2
+   || [ ! -x "$REPO/dsh-lookit/install.sh" ]; then
+  echo "error: $REPO does not look like a Lookit checkout" >&2
+  echo "       pass --repo /path/to/lookit" >&2
   exit 1
 fi
 if [ "$(uname -s)" != Darwin ]; then
-  echo "error: DragShot is macOS-only" >&2
+  echo "error: Lookit is macOS-only" >&2
   exit 1
 fi
 case "$(uname -m)" in
@@ -64,18 +64,18 @@ if [ ! -d "$WORKSPACE" ]; then
 fi
 WORKSPACE="$(cd "$WORKSPACE" && pwd -P)"
 
-INSTALL_DIR="${DRAGSHOT_INSTALL_DIR:-/Applications}"
+INSTALL_DIR="${LOOKIT_INSTALL_DIR:-/Applications}"
 if [ ! -w "$INSTALL_DIR" ] && [ "$INSTALL_DIR" = "/Applications" ]; then
   INSTALL_DIR="$HOME/Applications"
 fi
 mkdir -p "$INSTALL_DIR"
-export DRAGSHOT_INSTALL_DIR="$INSTALL_DIR"
-DEST="$INSTALL_DIR/DragShot.app"
+export LOOKIT_INSTALL_DIR="$INSTALL_DIR"
+DEST="$INSTALL_DIR/Lookit.app"
 
-echo "==> building DragShot"
+echo "==> building Lookit"
 ( cd "$REPO" && ./build.sh )
 
-echo "==> installing DragShot to $INSTALL_DIR"
+echo "==> installing Lookit to $INSTALL_DIR"
 ( cd "$REPO" && ./install.sh )
 
 DSH_BRIDGE_READY=0
@@ -87,21 +87,21 @@ case "$PROFILE_VALUE" in
 esac
 if [ -d "$PROFILE" ]; then
   echo "==> installing the DSH bridge"
-  if ( cd "$REPO/dsh-dragshot" && ./install.sh "$WORKSPACE" ); then
+  if ( cd "$REPO/dsh-lookit" && ./install.sh "$WORKSPACE" ); then
     DSH_BRIDGE_READY=1
-    defaults write local.dragshot dsh.enabled -bool true
-    defaults write local.dragshot dsh.target -string recent
-    defaults delete local.dragshot dsh.targetSessionID 2>/dev/null || true
-    defaults delete local.dragshot dsh.targetSessionTitle 2>/dev/null || true
+    defaults write local.lookit dsh.enabled -bool true
+    defaults write local.lookit dsh.target -string recent
+    defaults delete local.lookit dsh.targetSessionID 2>/dev/null || true
+    defaults delete local.lookit dsh.targetSessionTitle 2>/dev/null || true
   else
-    echo "warning: DSH bridge install failed; DragShot is installed without DSH sending." >&2
+    echo "warning: DSH bridge install failed; Lookit is installed without DSH sending." >&2
   fi
 else
   echo "warning: no DSH profile found at $PROFILE; skipping the bridge." >&2
 fi
 
 echo
-echo "==> opening DragShot"
+echo "==> opening Lookit"
 open "$DEST"
 
 cat <<EOF
@@ -115,6 +115,6 @@ Finish these user actions:
      labelled Device Control and Data Access.
   2. Enable three-finger drag in System Settings -> Accessibility -> Pointer
      Control -> Trackpad Options.
-  3. In DragShot's menu bar menu, confirm Send captures to DSH is on and the
+  3. In Lookit's menu bar menu, confirm Send captures to DSH is on and the
      bridge says Connected. Restart DSH once if it still says not loaded.
 EOF

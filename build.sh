@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build DragShot.app without Xcode: swiftc + a hand-rolled bundle + a stable signature.
+# Build Lookit.app without Xcode: swiftc + a hand-rolled bundle + a stable signature.
 #
 # The signature is the whole reason this script exists in this shape. macOS keys the Screen
 # Recording and Accessibility grants to the app's code identity, and an ad-hoc signature has
@@ -8,7 +8,7 @@
 # gives a stable identity that survives rebuilds.
 #
 # Create the certificate once (see DEVELOPMENT.md) and the default below finds it.
-# Passing DRAGSHOT_SIGN_ID=- falls back to ad-hoc, which is fine for a build you
+# Passing LOOKIT_SIGN_ID=- falls back to ad-hoc, which is fine for a build you
 # never have to grant.
 set -euo pipefail
 
@@ -18,17 +18,17 @@ command -v xcrun >/dev/null 2>&1 || {
 }
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-APP="$ROOT/build/DragShot.app"
+APP="$ROOT/build/Lookit.app"
 SOURCES=("$ROOT"/Sources/*.swift)
 SWIFT_FLAGS=(-O -whole-module-optimization)
 if [ "${1:-}" = "--tests" ]; then
-  APP="$ROOT/build/tests/DragShot.app"
+  APP="$ROOT/build/tests/Lookit.app"
   SOURCES+=("$ROOT"/tests/*.swift)
-  SWIFT_FLAGS+=(-D DRAGSHOT_TESTING)
+  SWIFT_FLAGS+=(-D LOOKIT_TESTING)
 fi
-SWIFTC="${DRAGSHOT_SWIFTC:-$(xcrun --find swiftc)}"
-TARGET="${DRAGSHOT_TARGET:-$(uname -m)-apple-macos26.0}"
-SIGN_ID="${DRAGSHOT_SIGN_ID:-DragShot Local Signing}"
+SWIFTC="${LOOKIT_SWIFTC:-$(xcrun --find swiftc)}"
+TARGET="${LOOKIT_TARGET:-$(uname -m)-apple-macos26.0}"
+SIGN_ID="${LOOKIT_SIGN_ID:-Lookit Local Signing}"
 
 if [ ! -x "$SWIFTC" ]; then
   echo "error: Swift compiler not found: $SWIFTC" >&2
@@ -38,19 +38,19 @@ fi
 
 # Command Line Tools can ship an SDK newer than the bundled compiler. Probe the
 # available SDKs with this exact compiler and target instead of hardcoding one.
-PROBE="/tmp/dragshot-sdk-probe-$$.swift"
+PROBE="/tmp/lookit-sdk-probe-$$.swift"
 printf 'import Foundation\n' > "$PROBE"
 trap 'rm -f "$PROBE"' EXIT
 try_sdk() {
   [ -d "$1" ] && "$SWIFTC" -sdk "$1" -target "$TARGET" -typecheck "$PROBE" >/dev/null 2>&1
 }
 
-if [ -n "${DRAGSHOT_SDK:-}" ]; then
-  if ! try_sdk "$DRAGSHOT_SDK"; then
-    echo "error: SDK does not work with this compiler: $DRAGSHOT_SDK" >&2
+if [ -n "${LOOKIT_SDK:-}" ]; then
+  if ! try_sdk "$LOOKIT_SDK"; then
+    echo "error: SDK does not work with this compiler: $LOOKIT_SDK" >&2
     exit 1
   fi
-  SDK="$DRAGSHOT_SDK"
+  SDK="$LOOKIT_SDK"
 else
   CANDIDATES=()
   DEFAULT_SDK="$(xcrun --sdk macosx --show-sdk-path 2>/dev/null || true)"
@@ -70,7 +70,7 @@ else
   done
   if [ -z "$SDK" ]; then
     echo "error: no macOS SDK works with this Swift compiler." >&2
-    echo "       Install matching Xcode Command Line Tools, or set DRAGSHOT_SDK." >&2
+    echo "       Install matching Xcode Command Line Tools, or set LOOKIT_SDK." >&2
     exit 1
   fi
 fi
@@ -93,7 +93,7 @@ echo "==> compiling (target $TARGET, SDK $SDK)"
   -framework ScreenCaptureKit \
   -framework ApplicationServices \
   -framework ImageIO \
-  -o "$APP/Contents/MacOS/DragShot" \
+  -o "$APP/Contents/MacOS/Lookit" \
   "${SWIFT_FLAGS[@]}" "${SOURCES[@]}"
 
 echo "==> bundling"
@@ -105,7 +105,7 @@ fi
 
 echo "==> signing (identity: $SIGN_ID)"
 codesign --force --deep --sign "$SIGN_ID" \
-  --identifier local.dragshot \
+  --identifier local.lookit \
   "$APP" 2>&1 | sed 's/^/    /'
 
 echo "==> verifying"
@@ -116,5 +116,5 @@ echo "built: $APP"
 echo
 echo "run:      open '$APP'                 # no debug trigger"
 echo "          open '$APP' --args --hotkey # also arms Command-Shift-4 as a trigger"
-echo "log:      tail -f ~/Library/Logs/DragShot.log"
-echo "captures: ~/Pictures/DragShot"
+echo "log:      tail -f ~/Library/Logs/Lookit.log"
+echo "captures: ~/Pictures/Lookit"

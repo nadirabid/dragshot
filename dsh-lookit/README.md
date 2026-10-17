@@ -1,7 +1,7 @@
-# dsh-dragshot
+# dsh-lookit
 
 A local Cordis plugin for the DSH desktop host. It gives the
-[DragShot](../) menu bar capture app a way to send a screenshot and
+[Lookit](../) menu bar capture app a way to send a screenshot and
 note into DSH without opening a second agent process.
 
 The plugin is deliberately small:
@@ -25,8 +25,8 @@ as the UI and can call `ctx.sessionController` directly.
 
 The script:
 
-- links this package into `~/.dsh/profiles/node_modules/dsh-dragshot`;
-- appends one `insert` row for `dsh-dragshot` to the profile's
+- links this package into `~/.dsh/profiles/node_modules/dsh-lookit`;
+- appends one `insert` row for `dsh-lookit` to the profile's
   `cordis.patch.yml`;
 - leaves the DSH app bundle untouched.
 
@@ -45,19 +45,19 @@ During development the profile can also carry an HMR root watch so edits to
 ```yaml
 - id: hmr
   config:
-    root: ["/path/to/dragshot/dsh-dragshot"]
+    root: ["/path/to/lookit/dsh-lookit"]
 ```
 
 The install script does not add this row; it is a development convenience, not
 part of the integration.
 
-Then enable **Send captures to DSH** in DragShot's menu bar menu.
+Then enable **Send captures to DSH** in Lookit's menu bar menu.
 
 Check that the bridge is up:
 
 ```sh
-ls -l "$HOME/Library/Application Support/DragShot/dsh-bridge.json"
-ls -l "$HOME/Library/Application Support/DragShot/dsh.sock"
+ls -l "$HOME/Library/Application Support/Lookit/dsh-bridge.json"
+ls -l "$HOME/Library/Application Support/Lookit/dsh.sock"
 ```
 
 ## Protocol
@@ -73,7 +73,7 @@ response per line. The socket directory and file are owner-only.
   "text":"Look at this",
   "imageBase64":"...",
   "imageMediaType":"image/png",
-  "imageName":"dragshot.png",
+  "imageName":"lookit.png",
   "mode":"queue"
 }}
 ```
@@ -93,7 +93,7 @@ overrides `target`. `send` returns:
 ```
 
 A new session starts in the most recent session's cwd when one exists, then in
-the profile's `defaultCwd`. The DragShot app may also supply a `cwd` from the
+the profile's `defaultCwd`. The Lookit app may also supply a `cwd` from the
 frontmost document.
 
 ## Files
@@ -113,11 +113,11 @@ node --test test/bridge.test.mjs
 The plugin appends metadata-only lines (method, session id, image byte count) to:
 
 ```
-~/Library/Logs/DragShotDshBridge.log
+~/Library/Logs/LookitDshBridge.log
 ```
 
 It never logs note text or image bytes. The bridge's own log file is separate
-from DragShot's log at `~/Library/Logs/DragShot.log`.
+from Lookit's log at `~/Library/Logs/Lookit.log`.
 
 ## Limitations
 

@@ -28,7 +28,7 @@ struct DSHSession {
     }
 }
 
-/// Failures worth showing in the transient notice and the DragShot log.
+/// Failures worth showing in the transient notice and the Lookit log.
 enum DSHIntegrationError: LocalizedError {
     case disabled
     case notInstalled
@@ -61,7 +61,7 @@ enum DSHIntegrationError: LocalizedError {
 /// Local-only DSH adapter.
 ///
 /// The DSH desktop app cannot be driven through its web server from another
-/// process, so it runs a host plugin (`dsh-dragshot`) that publishes a Unix
+/// process, so it runs a host plugin (`dsh-lookit`) that publishes a Unix
 /// socket. This class discovers that socket, launches DSH when needed, and
 /// sends one image plus note to a new session, the most recent one, or a
 /// session chosen in the composer picker.
@@ -108,10 +108,10 @@ final class DSHIntegration {
     static let bundleIdentifier = "com.deepseek.dsh"
     static let fallbackAppPath = "/Applications/DeepSeek Harness.app"
     static let discoveryURL = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Library/Application Support/DragShot/dsh-bridge.json")
+        .appendingPathComponent("Library/Application Support/Lookit/dsh-bridge.json")
 
     private let defaults = UserDefaults.standard
-    private let workQueue = DispatchQueue(label: "dragshot.dsh", qos: .utility)
+    private let workQueue = DispatchQueue(label: "lookit.dsh", qos: .utility)
 
     private init() {
         if defaults.string(forKey: Key.target) == nil {
@@ -262,7 +262,7 @@ final class DSHIntegration {
 
             guard let socket = self.waitForSocket(timeout: wasRunning ? 3.0 : 20.0) else {
                 let message = wasRunning
-                    ? "DSH is running, but its DragShot bridge is not loaded. Restart DSH once to load the plugin."
+                    ? "DSH is running, but its Lookit bridge is not loaded. Restart DSH once to load the plugin."
                     : "DSH did not finish starting in time."
                 DispatchQueue.main.async {
                     completion(.failure(DSHIntegrationError.bridgeUnavailable(message)))
@@ -275,7 +275,7 @@ final class DSHIntegration {
                 "text": text,
                 "imageBase64": png.base64EncodedString(),
                 "imageMediaType": "image/png",
-                "imageName": "dragshot.png",
+                "imageName": "lookit.png",
                 "mode": "queue",
             ]
             if case .session(let id, _) = target {
@@ -336,7 +336,7 @@ final class DSHIntegration {
             guard let socket = self.waitForSocket(timeout: 2.0) else {
                 DispatchQueue.main.async {
                     completion(.failure(DSHIntegrationError.bridgeUnavailable(
-                        "DSH's DragShot bridge is not loaded. Restart DSH once.")))
+                        "DSH's Lookit bridge is not loaded. Restart DSH once.")))
                 }
                 return
             }

@@ -15,7 +15,7 @@ enum UITests {
         }
         SelfTest.require(NSApp.keyWindow is PanelWindow && NSApp.keyWindow?.firstResponder is NSTextView,
                          "last finger lift must open and focus input before mouse-up arrives")
-        DragShot.shared.cancel()
+        Lookit.shared.cancel()
         SelfTest.require(EventTap.handle(type: .leftMouseUp,
                                         event: SelfTest.mouse(.leftMouseUp, quartz(end))) == nil,
                          "delayed mouse-up must be consumed after input dismissal")
@@ -55,9 +55,9 @@ enum UITests {
         }
 
         // Clicking away while the screenshot is in flight must prevent late presentation.
-        DragShot.shared.begin(at: start)
-        DragShot.shared.move(to: end)
-        DragShot.shared.end(at: end)
+        Lookit.shared.begin(at: start)
+        Lookit.shared.move(to: end)
+        Lookit.shared.end(at: end)
         let click = CGEvent(source: nil)!
         click.type = .leftMouseDown
         click.location = quartz(start)
@@ -159,11 +159,11 @@ enum UITests {
 
     @MainActor
     private static func compose(from start: NSPoint, to end: NSPoint) async throws -> PanelWindow {
-        DragShot.shared.begin(at: start)
-        DragShot.shared.move(to: end)
-        DragShot.shared.end(at: end)
+        Lookit.shared.begin(at: start)
+        Lookit.shared.move(to: end)
+        Lookit.shared.end(at: end)
         guard let panel = NSApp.keyWindow as? PanelWindow else {
-            throw NSError(domain: "DragShotTests", code: 2,
+            throw NSError(domain: "LookitTests", code: 2,
                           userInfo: [NSLocalizedDescriptionKey: "Release did not immediately focus input"])
         }
         SelfTest.require(panel.firstResponder is NSTextView && panel.isVisible && panel.alphaValue == 1,

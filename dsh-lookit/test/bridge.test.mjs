@@ -4,10 +4,10 @@ import net from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
-import { DragShotBridge, PROTOCOL } from '../lib/bridge.js'
+import { LookitBridge, PROTOCOL } from '../lib/bridge.js'
 
 async function workspace() {
-    const root = await fs.mkdtemp(join(tmpdir(), 'dsh-dragshot-test-'))
+    const root = await fs.mkdtemp(join(tmpdir(), 'dsh-lookit-test-'))
     return {
         root,
         socket: join(root, 'dsh.sock'),
@@ -89,7 +89,7 @@ async function call(socketPath, request, timeoutMs = 5000) {
 }
 
 async function startBridge(controller, paths, overrides = {}) {
-    const bridge = new DragShotBridge({
+    const bridge = new LookitBridge({
         sessionController: controller,
         socketPath: paths.socket,
         discoveryPath: paths.discovery,

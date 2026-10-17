@@ -323,7 +323,7 @@ final class PanelWindow: NSPanel, NSTextViewDelegate, NSWindowDelegate {
         return true
     }
 
-#if DRAGSHOT_TESTING
+#if LOOKIT_TESTING
     var testPickerVisible: Bool { isSessionPickerVisible }
     var testEditorFocused: Bool { firstResponder === textView }
 

@@ -1,8 +1,8 @@
 {
-  "name": "dsh-dragshot",
+  "name": "dsh-lookit",
   "version": "0.2.0",
   "private": true,
-  "description": "Local DragShot bridge for DeepSeek Harness: accepts a screenshot and note and sends them to a chosen, new, or most recently used DSH session.",
+  "description": "Local Lookit bridge for DeepSeek Harness: accepts a screenshot and note and sends them to a chosen, new, or most recently used DSH session.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {

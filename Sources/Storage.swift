@@ -7,7 +7,7 @@ struct SavedCapture {
 }
 
 enum Storage {
-    static let directory = NSString(string: "~/Pictures/DragShot").expandingTildeInPath
+    static let directory = NSString(string: "~/Pictures/Lookit").expandingTildeInPath
 
     static func pngData(image: CGImage) throws -> Data {
         let rep = NSBitmapImageRep(cgImage: image)
@@ -22,7 +22,7 @@ enum Storage {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let stamp = ISO8601DateFormatter()
         stamp.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let name = "dragshot-\(stamp.string(from: Date()).replacingOccurrences(of: ":", with: "-"))"
+        let name = "lookit-\(stamp.string(from: Date()).replacingOccurrences(of: ":", with: "-"))"
         let png = folder.appendingPathComponent(name + ".png")
         let note = folder.appendingPathComponent(name + ".txt")
         try pngData(image: image).write(to: png, options: .atomic)

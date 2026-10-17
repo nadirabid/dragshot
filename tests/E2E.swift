@@ -7,7 +7,7 @@ enum E2E {
             do {
                 try FileManager.default.createDirectory(at: SelfTest.output, withIntermediateDirectories: true)
                 guard Permissions.allGranted, EventTap.isRunning, let screen = NSScreen.main else {
-                    throw NSError(domain: "DragShotTests", code: 1,
+                    throw NSError(domain: "LookitTests", code: 1,
                                   userInfo: [NSLocalizedDescriptionKey: "App permissions or event tap missing"])
                 }
                 if CommandLine.arguments.contains("--ui-review") {
@@ -55,13 +55,13 @@ enum E2E {
                 try await screenshot(screen: screen, rect: panel!.frame.insetBy(dx: -12, dy: -12),
                                      name: "panel-live.png")
                 guard panel!.isVisible, let editor = panel!.firstResponder as? NSTextView else {
-                    throw NSError(domain: "DragShotTests", code: 3,
+                    throw NSError(domain: "LookitTests", code: 3,
                                   userInfo: [NSLocalizedDescriptionKey:
                                     "Input dismissed during UI test; outside interaction interrupted the run"])
                 }
                 SelfTest.require(UITests.attachmentImage(in: panel!.contentView!) != nil,
                                  "real screen capture must appear as the message attachment")
-                let text = "DragShot capture test \(UUID().uuidString)"
+                let text = "Lookit capture test \(UUID().uuidString)"
                 editor.string = text
                 editor.didChangeText()
                 _ = panel!.textView(editor, doCommandBy: #selector(NSResponder.insertNewline(_:)))
@@ -70,11 +70,11 @@ enum E2E {
                 }, "Return must dismiss the note panel and selection together before returning")
                 let nextStart = CGPoint(x: 200, y: screen.frame.maxY - 240)
                 let nextEnd = CGPoint(x: 620, y: screen.frame.maxY - 480)
-                DragShot.shared.begin(at: nextStart)
-                DragShot.shared.move(to: nextEnd)
+                Lookit.shared.begin(at: nextStart)
+                Lookit.shared.move(to: nextEnd)
                 SelfTest.require(NSApp.windows.contains { $0 is OverlayWindow && $0.isVisible },
                                  "a new selection can begin immediately after saving")
-                DragShot.shared.cancel()
+                Lookit.shared.cancel()
                 let after = Set(try FileManager.default.contentsOfDirectory(atPath: Storage.directory))
                 let added = after.subtracting(before)
                 let shots = added.filter { $0.hasSuffix(".png") }
@@ -95,9 +95,9 @@ enum E2E {
                 try FileManager.default.removeItem(at: png)
                 try FileManager.default.removeItem(at: note)
                 // Submit in the same main-actor turn as release, before capture can run.
-                DragShot.shared.begin(at: nextStart)
-                DragShot.shared.move(to: nextEnd)
-                DragShot.shared.end(at: nextEnd)
+                Lookit.shared.begin(at: nextStart)
+                Lookit.shared.move(to: nextEnd)
+                Lookit.shared.end(at: nextEnd)
                 let immediate = NSApp.keyWindow as? PanelWindow
                 SelfTest.require(immediate?.isVisible == true && immediate?.alphaValue == 1,
                                  "release must show input synchronously at full opacity")
@@ -112,14 +112,14 @@ enum E2E {
                     return nil
                 }
                 guard let sendButton = findSendButton(immediate!.contentView!) else {
-                    throw NSError(domain: "DragShotTests", code: 4,
+                    throw NSError(domain: "LookitTests", code: 4,
                                   userInfo: [NSLocalizedDescriptionKey: "Composer has no send button"])
                 }
                 sendButton.performClick(nil)
                 SelfTest.require(!NSApp.windows.contains {
                     ($0 is PanelWindow || $0 is OverlayWindow) && $0.isVisible
                 }, "Return before capture completes must dismiss both surfaces immediately")
-                SelfTest.require(!DragShot.shared.cancel(), "submitted capture must survive subsequent Escape")
+                SelfTest.require(!Lookit.shared.cancel(), "submitted capture must survive subsequent Escape")
                 var earlyShots: Set<String> = []
                 for _ in 0..<100 {
                     let files = Set(try FileManager.default.contentsOfDirectory(atPath: Storage.directory))
@@ -138,15 +138,15 @@ enum E2E {
                 // even when a new selection has already started.
                 let cocoaStart = CGPoint(x: 180, y: screen.frame.maxY - 200)
                 let cocoaEnd = CGPoint(x: 580, y: screen.frame.maxY - 420)
-                DragShot.shared.begin(at: cocoaStart)
-                DragShot.shared.move(to: cocoaEnd)
-                DragShot.shared.end(at: cocoaEnd)
-                DragShot.shared.cancel()
-                DragShot.shared.begin(at: cocoaStart)
+                Lookit.shared.begin(at: cocoaStart)
+                Lookit.shared.move(to: cocoaEnd)
+                Lookit.shared.end(at: cocoaEnd)
+                Lookit.shared.cancel()
+                Lookit.shared.begin(at: cocoaStart)
                 try await Task.sleep(nanoseconds: 500_000_000)
                 SelfTest.require(!NSApp.windows.contains { $0 is PanelWindow && $0.isVisible },
                                  "cancelled capture must not reopen the note panel")
-                DragShot.shared.end(at: cocoaStart)
+                Lookit.shared.end(at: cocoaStart)
                 SelfTest.require(!NSApp.windows.contains { $0 is OverlayWindow && $0.isVisible },
                                  "a tap must not leave an overlay")
                 try await UITests.run(screen: screen)

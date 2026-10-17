@@ -3,9 +3,9 @@ import Foundation
 /// stderr is only mirrored when a terminal is attached. Writing to an unread pipe would
 /// block, and this process spends its life on the main thread waiting for gestures.
 enum Log {
-    static let path = NSString(string: "~/Library/Logs/DragShot.log").expandingTildeInPath
+    static let path = NSString(string: "~/Library/Logs/Lookit.log").expandingTildeInPath
 
-    private static let queue = DispatchQueue(label: "dragshot.log")
+    private static let queue = DispatchQueue(label: "lookit.log")
     private static let toTerminal = isatty(STDERR_FILENO) == 1
     private static let formatter: DateFormatter = {
         let f = DateFormatter()

@@ -1,10 +1,10 @@
-# The DragShot bundle patch: one host row mounting the local capture bridge.
+# The Lookit bundle patch: one host row mounting the local capture bridge.
 #
 # The profile's own cordis.patch.yml can override this row by id. Keep every
 # field you want when overriding one: a patch replaces the whole config.
 - insert:
-    - id: dragshot-bridge
-      name: dsh-dragshot
+    - id: lookit-bridge
+      name: dsh-lookit
       config:
         enabled: true
         # New sessions inherit the most recent session's cwd when it exists;

@@ -1,8 +1,8 @@
 import Cocoa
 
 /// Selection stays in Cocoa points. Only the finished region is captured, on release.
-final class DragShot {
-    static let shared = DragShot()
+final class Lookit {
+    static let shared = Lookit()
 
     private enum State { case idle, aiming, armed, selecting, composing, submitting }
     private var state: State = .idle
@@ -100,7 +100,7 @@ final class DragShot {
         guard Permissions.hasScreenRecording,
               let screen = NSScreen.screens.first(where: { NSMouseInRect(point, $0.frame, false) }) else {
             reset()
-            Notice.show("DragShot needs Screen Recording — grant it from the menu bar")
+            Notice.show("Lookit needs Screen Recording — grant it from the menu bar")
             return
         }
         generation += 1

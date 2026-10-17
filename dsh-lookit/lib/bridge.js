@@ -1,5 +1,5 @@
 /**
- * The DragShot bridge.
+ * The Lookit bridge.
  *
  * A small, local-only server inside the DSH host. It exposes the one thing an
  * external capture app needs and nothing else: list sessions, and send one
@@ -63,7 +63,7 @@ function errorPayload(error) {
     return { code, message: message.slice(0, 2000) }
 }
 
-export class DragShotBridge {
+export class LookitBridge {
     #server
     #sockets = new Set()
     #stopping = false
@@ -71,9 +71,9 @@ export class DragShotBridge {
 
     constructor({
         sessionController,
-        socketPath = join(homedir(), 'Library', 'Application Support', 'DragShot', 'dsh.sock'),
-        discoveryPath = join(homedir(), 'Library', 'Application Support', 'DragShot', 'dsh-bridge.json'),
-        logPath = join(homedir(), 'Library', 'Logs', 'DragShotDshBridge.log'),
+        socketPath = join(homedir(), 'Library', 'Application Support', 'Lookit', 'dsh.sock'),
+        discoveryPath = join(homedir(), 'Library', 'Application Support', 'Lookit', 'dsh-bridge.json'),
+        logPath = join(homedir(), 'Library', 'Logs', 'LookitDshBridge.log'),
         defaultCwd = homedir(),
         requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
         promptTimeoutMs = DEFAULT_PROMPT_TIMEOUT_MS,
@@ -85,7 +85,7 @@ export class DragShotBridge {
         now = () => new Date().toISOString(),
     } = {}) {
         if (typeof socketPath !== 'string' || socketPath.length === 0) {
-            throw new TypeError('DragShotBridge: socketPath is required')
+            throw new TypeError('LookitBridge: socketPath is required')
         }
         this.sessionController = sessionController
         this.socketPath = socketPath
@@ -114,7 +114,7 @@ export class DragShotBridge {
         if (this.#server !== undefined) return
         if (Buffer.byteLength(this.socketPath) > 100) {
             throw new BridgeError('socket_path_too_long',
-                'The DragShot socket path must fit in a Unix socket address (100 bytes).')
+                'The Lookit socket path must fit in a Unix socket address (100 bytes).')
         }
 
         await fs.mkdir(dirname(this.socketPath), { recursive: true, mode: 0o700 })
@@ -167,7 +167,7 @@ export class DragShotBridge {
             await Promise.resolve(server.close()).catch(() => {})
             await fs.unlink(this.socketPath).catch(() => {})
             throw new BridgeError('discovery_write_failed',
-                `Could not publish the DragShot discovery file: ${error?.message ?? error}`)
+                `Could not publish the Lookit discovery file: ${error?.message ?? error}`)
         }
 
         this.#server = server
@@ -246,7 +246,7 @@ export class DragShotBridge {
             case 'hello':
                 return {
                     protocol: PROTOCOL,
-                    plugin: 'dsh-dragshot',
+                    plugin: 'dsh-lookit',
                     pid: process.pid,
                     methods: ['hello', 'ping', 'list', 'send'],
                 }
@@ -354,8 +354,8 @@ export class DragShotBridge {
             throw new BridgeError('image_too_large',
                 `The screenshot is larger than ${Math.round(this.maxImageBytes / (1024 * 1024))} MB.`)
         }
-        const rawName = typeof params.imageName === 'string' ? params.imageName : 'dragshot.png'
-        const name = rawName.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 200) || 'dragshot.png'
+        const rawName = typeof params.imageName === 'string' ? params.imageName : 'lookit.png'
+        const name = rawName.replace(/[\u0000-\u001f\u007f]/g, '').slice(0, 200) || 'lookit.png'
         return { mediaType, data: raw, name, bytes }
     }
 
@@ -437,7 +437,7 @@ export class DragShotBridge {
 
     #log(message) {
         const line = `${this.now()} ${message}\n`
-        try { this.logger?.warn?.(`dragshot: ${message}`) } catch { /* logging never breaks the bridge */ }
+        try { this.logger?.warn?.(`lookit: ${message}`) } catch { /* logging never breaks the bridge */ }
         if (typeof this.logPath !== 'string' || this.logPath.length === 0) return
         if (this.#logReady === undefined) {
             this.#logReady = fs.mkdir(dirname(this.logPath), { recursive: true })

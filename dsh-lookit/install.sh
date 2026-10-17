@@ -1,5 +1,5 @@
 #!/bin/bash
-# Install the DragShot bridge into a DSH profile without touching the app bundle.
+# Install the Lookit bridge into a DSH profile without touching the app bundle.
 #
 # DSH resolves plugins from ~/.dsh/profiles/node_modules. The desktop profile's
 # own patch layer inserts this row by package name. HMR watches that patch, so
@@ -29,7 +29,7 @@ fi
 
 echo "==> linking plugin"
 mkdir -p "$PROFILE_MODULES"
-ln -sfn "$ROOT" "$PROFILE_MODULES/dsh-dragshot"
+ln -sfn "$ROOT" "$PROFILE_MODULES/dsh-lookit"
 
 # The plugin imports @deepseek-ai/schemastery. Node resolves that from the
 # plugin's real path, so give it the same local link dsh-self uses.
@@ -41,17 +41,17 @@ fi
 
 PATCH="$PROFILE/cordis.patch.yml"
 touch "$PATCH"
-if grep -q 'id: dragshot-bridge' "$PATCH"; then
-  echo "==> profile already contains dragshot-bridge"
+if grep -q 'id: lookit-bridge' "$PATCH"; then
+  echo "==> profile already contains lookit-bridge"
 else
-  echo "==> appending dragshot-bridge to $PATCH"
+  echo "==> appending lookit-bridge to $PATCH"
   cp "$PATCH" "$PATCH.bak.$(date +%Y%m%d-%H%M%S)"
   cat >> "$PATCH" <<EOF
 
-# DragShot capture bridge. Local Unix socket, owner-only; no TCP port.
+# Lookit capture bridge. Local Unix socket, owner-only; no TCP port.
 - insert:
-    - id: dragshot-bridge
-      name: dsh-dragshot
+    - id: lookit-bridge
+      name: dsh-lookit
       config:
         enabled: true
         defaultCwd: "$DEFAULT_CWD"
@@ -60,11 +60,11 @@ fi
 
 echo
 echo "installed:"
-echo "  plugin:    $PROFILE_MODULES/dsh-dragshot"
+echo "  plugin:    $PROFILE_MODULES/dsh-lookit"
 echo "  profile:   $PATCH"
 echo "  default:   $DEFAULT_CWD"
-echo "  socket:    $HOME/Library/Application Support/DragShot/dsh.sock"
-echo "  discovery: $HOME/Library/Application Support/DragShot/dsh-bridge.json"
+echo "  socket:    $HOME/Library/Application Support/Lookit/dsh.sock"
+echo "  discovery: $HOME/Library/Application Support/Lookit/dsh-bridge.json"
 echo
 echo "If DSH is already running, its HMR watcher normally loads the new row."
 echo "If the discovery file does not appear, restart DSH once:"

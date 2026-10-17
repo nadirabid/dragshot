@@ -2,14 +2,14 @@ import Cocoa
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
-    #if DRAGSHOT_TESTING
+    #if LOOKIT_TESTING
     var runE2EOnLaunch = false
     #endif
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
         buildStatusItem()
-        DragShot.shared.start()
+        Lookit.shared.start()
 
         // Used once, on first run, to raise the two grants. Never automatic: launching the app
         // at login should not produce dialogs.
@@ -19,13 +19,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             scheduleMenuRefresh()
         }
 
-        #if DRAGSHOT_TESTING
+        #if LOOKIT_TESTING
         if runE2EOnLaunch { E2E.run() }
         #endif
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        DragShot.shared.cancel()
+        Lookit.shared.cancel()
     }
 
     // MARK: - Menu bar
@@ -34,7 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.image = NSImage(
             systemSymbolName: "crop",
-            accessibilityDescription: "DragShot"
+            accessibilityDescription: "Lookit"
         )
         item.button?.image?.isTemplate = true
         statusItem = item
@@ -45,7 +45,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func refreshMenu() {
         let menu = NSMenu()
 
-        let header = NSMenuItem(title: "DragShot", action: nil, keyEquivalent: "")
+        let header = NSMenuItem(title: "Lookit", action: nil, keyEquivalent: "")
         header.isEnabled = false
         menu.addItem(header)
         menu.addItem(.separator())
@@ -56,7 +56,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         threeFinger.isEnabled = false
         menu.addItem(threeFinger)
 
-        if DragShot.shared.hotkeyEnabled {
+        if Lookit.shared.hotkeyEnabled {
             let hotkey = NSMenuItem(title: "Debug trigger: ⌘⇧4", action: nil, keyEquivalent: "")
             hotkey.isEnabled = false
             menu.addItem(hotkey)
@@ -105,7 +105,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: "Reveal Log",
                                 action: #selector(revealLog), keyEquivalent: ""))
         menu.addItem(.separator())
-        menu.addItem(NSMenuItem(title: "Quit DragShot",
+        menu.addItem(NSMenuItem(title: "Quit Lookit",
                                 action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
 
         wireMenuTargets(menu)
@@ -253,7 +253,7 @@ if CommandLine.arguments.contains("--status") {
     exit(Permissions.allGranted ? 0 : 1)
 }
 
-#if DRAGSHOT_TESTING
+#if LOOKIT_TESTING
 // Clean README capture: the real AppKit glass UI and sample content over a
 // caller-supplied macOS wallpaper. No personal desktop content is included.
 if let index = CommandLine.arguments.firstIndex(of: "--readme-shot"),
@@ -274,11 +274,11 @@ if CommandLine.arguments.contains("--selftest") {
 
 let delegate = AppDelegate()
 app.delegate = delegate
-DragShot.shared.hotkeyEnabled = CommandLine.arguments.contains("--hotkey")
-#if DRAGSHOT_TESTING
+Lookit.shared.hotkeyEnabled = CommandLine.arguments.contains("--hotkey")
+#if LOOKIT_TESTING
 if CommandLine.arguments.contains("--e2e") {
     delegate.runE2EOnLaunch = true
-    DragShot.shared.hotkeyEnabled = true
+    Lookit.shared.hotkeyEnabled = true
 }
 #endif
 app.run()

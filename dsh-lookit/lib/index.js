@@ -1,7 +1,7 @@
 /**
- * dsh-dragshot — a local capture bridge for the DSH desktop host.
+ * dsh-lookit — a local capture bridge for the DSH desktop host.
  *
- * DragShot (the menu bar capture app) writes a screenshot and note to a Unix
+ * Lookit (the menu bar capture app) writes a screenshot and note to a Unix
  * socket. This plugin turns that into a real DSH session: it sends to a chosen
  * session, the most recently used session, or a new one in the most recent
  * session's directory (or the configured default).
@@ -19,24 +19,24 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import z from '@deepseek-ai/schemastery'
-import { DragShotBridge } from './bridge.js'
+import { LookitBridge } from './bridge.js'
 
-export const name = 'dragshot'
+export const name = 'lookit'
 
 /** The live Session Controller is the whole reason this is a host plugin. */
 export const inject = ['sessionController']
 
-const SUPPORT = join(homedir(), 'Library', 'Application Support', 'DragShot')
+const SUPPORT = join(homedir(), 'Library', 'Application Support', 'Lookit')
 
 export const Config = z.object({
     /** Mount or disable the bridge without removing the row. */
     enabled: z.boolean().default(true),
-    /** Unix socket the DragShot app connects to. */
+    /** Unix socket the Lookit app connects to. */
     socketPath: z.string().default(join(SUPPORT, 'dsh.sock')),
-    /** Discovery file read by DragShot; contains the socket path and protocol version. */
+    /** Discovery file read by Lookit; contains the socket path and protocol version. */
     discoveryPath: z.string().default(join(SUPPORT, 'dsh-bridge.json')),
     /** Diagnostics only. Contains method names and session ids, never note text or image bytes. */
-    logPath: z.string().default(join(homedir(), 'Library', 'Logs', 'DragShotDshBridge.log')),
+    logPath: z.string().default(join(homedir(), 'Library', 'Logs', 'LookitDshBridge.log')),
     /** New sessions start here when there is no recent session cwd. */
     defaultCwd: z.string().default(homedir()),
     /** Deadline for the session-list read. */
@@ -60,7 +60,7 @@ export const Config = z.object({
 export function apply(ctx, config) {
     if (!config.enabled) return
 
-    const bridge = new DragShotBridge({
+    const bridge = new LookitBridge({
         sessionController: ctx.sessionController,
         socketPath: config.socketPath,
         discoveryPath: config.discoveryPath,
@@ -77,11 +77,11 @@ export function apply(ctx, config) {
 
     ctx.effect(() => {
         const ready = bridge.start().catch((error) => {
-            ctx.logger?.warn?.(`dragshot: bridge failed to start: ${error instanceof Error ? error.message : String(error)}`)
+            ctx.logger?.warn?.(`lookit: bridge failed to start: ${error instanceof Error ? error.message : String(error)}`)
         })
         return async () => {
             await ready
             await bridge.stop()
         }
-    }, 'dragshot.bridge')
+    }, 'lookit.bridge')
 }
