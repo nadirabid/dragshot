@@ -3,6 +3,31 @@
 Technical notes for building, extending, and verifying DragShot. The [README](README.md)
 is the short user guide.
 
+## Using it
+
+Three-finger drag across a region. Release to open the composer. Return saves a PNG and note
+to `~/Pictures/DragShot/` and copies the image to the clipboard. Shift-Return inserts a newline;
+Escape cancels. When DSH sending is enabled, the bottom target chip chooses the chat; the
+default is the most recent session, and `⌘/` or a leading slash opens the picker.
+
+## Install with DSH
+
+The repository ships the `install-dragshot` skill at
+[`skills/install-dragshot/SKILL.md`](skills/install-dragshot/SKILL.md). Link it into the DSH
+skill catalog once from the checkout root:
+
+```sh
+mkdir -p ~/.dsh/skills
+ln -sfn "$PWD/skills/install-dragshot" ~/.dsh/skills/install-dragshot
+```
+
+Then ask DSH to install DragShot from this repo. The skill builds and installs the app, sets up
+the Cordis bridge, enables DSH sending, and hands off the permission and three-finger trackpad
+steps. Restart DSH once if the skill does not appear in the catalog.
+
+The skill's wrapper is `skills/install-dragshot/scripts/install.sh`; it is safe to rerun for an
+upgrade. The manual build path is below.
+
 ## Selection and event ownership
 
 The desktop stays live during selection. DragShot draws only a system crosshair, a softly
