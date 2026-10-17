@@ -49,10 +49,10 @@ if [ "$(uname -s)" != Darwin ]; then
   echo "error: DragShot is macOS-only" >&2
   exit 1
 fi
-if [ "$(uname -m)" != arm64 ]; then
-  echo "error: the build requires Apple silicon" >&2
-  exit 1
-fi
+case "$(uname -m)" in
+  arm64|x86_64) ;;
+  *) echo "error: unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+esac
 MAJOR="$(sw_vers -productVersion | cut -d. -f1)"
 if [ "$MAJOR" -lt 26 ]; then
   echo "error: macOS 26 or later is required" >&2
@@ -64,10 +64,18 @@ if [ ! -d "$WORKSPACE" ]; then
 fi
 WORKSPACE="$(cd "$WORKSPACE" && pwd -P)"
 
+INSTALL_DIR="${DRAGSHOT_INSTALL_DIR:-/Applications}"
+if [ ! -w "$INSTALL_DIR" ] && [ "$INSTALL_DIR" = "/Applications" ]; then
+  INSTALL_DIR="$HOME/Applications"
+fi
+mkdir -p "$INSTALL_DIR"
+export DRAGSHOT_INSTALL_DIR="$INSTALL_DIR"
+DEST="$INSTALL_DIR/DragShot.app"
+
 echo "==> building DragShot"
 ( cd "$REPO" && ./build.sh )
 
-echo "==> installing DragShot to /Applications"
+echo "==> installing DragShot to $INSTALL_DIR"
 ( cd "$REPO" && ./install.sh )
 
 DSH_BRIDGE_READY=0
@@ -92,7 +100,6 @@ else
   echo "warning: no DSH profile found at $PROFILE; skipping the bridge." >&2
 fi
 
-DEST="/Applications/DragShot.app"
 echo
 echo "==> opening DragShot"
 open "$DEST"

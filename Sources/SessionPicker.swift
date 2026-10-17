@@ -11,7 +11,6 @@ private final class SessionPickerRow: NSView {
     private let subtitleLabel = NSTextField(labelWithString: "")
     private let check = NSImageView()
     private var hover = false
-    private var pressed = false
 
     var selected = false {
         didSet { updateAppearance() }
@@ -169,18 +168,15 @@ private final class SessionPickerRow: NSView {
 
     override func mouseExited(with event: NSEvent) {
         hover = false
-        pressed = false
         updateLayer()
     }
 
     override func mouseDown(with event: NSEvent) {
-        pressed = true
         updateLayer()
     }
 
     override func mouseUp(with event: NSEvent) {
         let inside = bounds.contains(convert(event.locationInWindow, from: nil))
-        pressed = false
         updateLayer()
         if inside { onClick?() }
     }

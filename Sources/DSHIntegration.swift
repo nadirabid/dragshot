@@ -11,14 +11,13 @@ struct DSHSendResult {
 
 /// One session as exposed by the DSH bridge. `updatedAt` and `lastPromptAt`
 /// arrive as epoch milliseconds and are normalized to seconds here.
-struct DSHSession: Identifiable {
+struct DSHSession {
     let id: String
     let title: String
     let cwd: String?
     let updatedAt: TimeInterval
     let lastPromptAt: TimeInterval?
     let running: Bool
-    let blank: Bool
 
     var activity: TimeInterval { lastPromptAt ?? updatedAt }
 
@@ -35,7 +34,6 @@ enum DSHIntegrationError: LocalizedError {
     case notInstalled
     case bridgeUnavailable(String)
     case launchFailed(String)
-    case timedOut(String)
     case invalidResponse(String)
     case socket(String)
     case server(code: String, message: String)
@@ -50,8 +48,6 @@ enum DSHIntegrationError: LocalizedError {
             return message
         case .launchFailed(let message):
             return "Could not open DSH: \(message)"
-        case .timedOut(let message):
-            return message
         case .invalidResponse(let message):
             return "DSH returned an unexpected response: \(message)"
         case .socket(let message):
@@ -95,7 +91,7 @@ final class DSHIntegration {
     }
 
     enum BridgeState {
-        case ready(socket: String)
+        case ready
         case appNotRunning
         case bridgeMissing
         case notInstalled
@@ -113,14 +109,9 @@ final class DSHIntegration {
     static let fallbackAppPath = "/Applications/DeepSeek Harness.app"
     static let discoveryURL = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Application Support/DragShot/dsh-bridge.json")
-    static let defaultSocketURL = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Library/Application Support/DragShot/dsh.sock")
 
     private let defaults = UserDefaults.standard
     private let workQueue = DispatchQueue(label: "dragshot.dsh", qos: .utility)
-
-    /// Test hook: override the socket path and bypass discovery.
-    var socketPathOverride: String?
 
     private init() {
         if defaults.string(forKey: Key.target) == nil {
@@ -196,7 +187,7 @@ final class DSHIntegration {
 
     var bridgeState: BridgeState {
         guard Self.appURL != nil else { return .notInstalled }
-        if let socket = discoverySocketPath() { return .ready(socket: socket) }
+        if discoverySocketPath() != nil { return .ready }
         if !isDSHRunning { return .appNotRunning }
         return .bridgeMissing
     }
@@ -374,26 +365,15 @@ final class DSHIntegration {
         let lastPrompt = (object["lastPromptAt"] as? NSNumber)?.doubleValue
         return DSHSession(
             id: id,
-            title: rawTitle.isEmpty ? "New session" : rawTitle,
+            title: rawTitle.isEmpty ? "New chat" : rawTitle,
             cwd: object["cwd"] as? String,
             updatedAt: updated > 0 ? updated / 1000 : 0,
             lastPromptAt: lastPrompt.map { $0 / 1000 },
-            running: object["running"] as? Bool ?? false,
-            blank: object["blank"] as? Bool ?? false
+            running: object["running"] as? Bool ?? false
         )
     }
 
     private func waitForSocket(timeout: TimeInterval) -> String? {
-        if let override = socketPathOverride, !override.isEmpty {
-            // The debug override is used by the self-test harness. Give the
-            // fake server the same short window a real bridge gets.
-            let deadline = Date().addingTimeInterval(timeout)
-            repeat {
-                if FileManager.default.fileExists(atPath: override) { return override }
-                Thread.sleep(forTimeInterval: 0.1)
-            } while Date() < deadline
-            return nil
-        }
         let deadline = Date().addingTimeInterval(timeout)
         repeat {
             if let socket = discoverySocketPath() { return socket }
@@ -405,9 +385,6 @@ final class DSHIntegration {
     /// Read and validate the plugin's discovery file. A stale file whose socket
     /// is gone is treated as missing, so the caller gets the restart advice.
     func discoverySocketPath() -> String? {
-        if let override = socketPathOverride, !override.isEmpty {
-            return FileManager.default.fileExists(atPath: override) ? override : nil
-        }
         guard let data = try? Data(contentsOf: Self.discoveryURL),
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let socket = object["socket"] as? String,

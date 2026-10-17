@@ -4,10 +4,7 @@ import Cocoa
 /// session picker. Forcing the active state keeps the two surfaces visually
 /// identical even when one of them owns keyboard focus.
 final class GlassSurfaceView: NSVisualEffectView {
-    private let cornerRadius: CGFloat
-
     init(cornerRadius: CGFloat) {
-        self.cornerRadius = cornerRadius
         super.init(frame: .zero)
         material = .popover
         blendingMode = .behindWindow

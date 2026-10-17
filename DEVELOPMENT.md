@@ -28,6 +28,59 @@ steps. Restart DSH once if the skill does not appear in the catalog.
 The skill's wrapper is `skills/install-dragshot/scripts/install.sh`; it is safe to rerun for an
 upgrade. The manual build path is below.
 
+## Privacy
+
+DragShot collects no data and has no network client. No account, analytics, telemetry,
+crash reporter, API key, or remote service is involved. Everything the app and its local
+bridge do happens on the Mac.
+
+The DSH handoff is local: DragShot writes one request to an owner-only Unix domain socket that
+the `dsh-dragshot` host plugin listens on. DSH itself is a separate application; any network
+behavior it has for its own model calls is outside DragShot.
+
+### What is stored locally
+
+- Captures and notes: `~/Pictures/DragShot/` (PNG plus the text note).
+- Settings: the `local.dragshot` `UserDefaults` domain (enabled state, target session id/title,
+  and whether to activate DSH after send).
+- Diagnostics: `~/Library/Logs/DragShot.log` and
+  `~/Library/Logs/DragShotDshBridge.log`. These contain metadata such as method names, session
+  ids, image dimensions, and error descriptions; the bridge never logs note text or image
+  bytes.
+- While DSH sending is enabled: `~/Library/Application Support/DragShot/dsh-bridge.json` and
+  `dsh.sock`, plus the DSH profile's plugin row.
+- The captured image is copied to the system pasteboard.
+
+None of these are uploaded or collected by DragShot.
+
+### Network audit
+
+- No `URLSession`, `URLRequest`, `NSURLConnection`, `NWConnection`, WebSocket, HTTP client, or
+  `fetch` in `Sources/` or `dsh-dragshot/lib/`.
+- The app links Cocoa, ScreenCaptureKit, ApplicationServices, ImageIO, and their system
+  dependencies; no CFNetwork/Network framework.
+- The DSH client uses `AF_UNIX`/`SOCK_STREAM`; the plugin uses `node:net` to `listen` on a Unix
+  socket path, not a TCP port.
+- The signed app has no entitlements, including no network entitlement.
+- The app has no third-party dependencies. The bridge's only peer dependencies are DSH host
+  packages that DSH already provides.
+
+### Verification
+
+Run these from the repository:
+
+```sh
+grep -RInE 'URLSession|URLRequest|NSURLConnection|NWConnection|WebSocket|https?://|fetch\(' \
+  Sources dsh-dragshot/lib
+otool -L build/DragShot.app/Contents/MacOS/DragShot
+codesign -d --entitlements :- build/DragShot.app
+wc -l Sources/*.swift dsh-dragshot/lib/*.js
+```
+
+At the time of the audit the network search returns no matches, `otool` shows no
+CFNetwork/Network dependency, the entitlements output is empty, and the app plus bridge are
+under 4,000 lines. The plugin listens only on its Unix socket. These are source and build checks, not browser-visible claims in a separate dashboard.
+
 ## Selection and event ownership
 
 The desktop stays live during selection. DragShot draws only a system crosshair, a softly
@@ -194,7 +247,7 @@ generated `*.pem` and `*.p12` files are gitignored.
 
 ## Build and run
 
-Requires Apple silicon and macOS 26 or later.
+Requires macOS 26 or later. Tested on Apple silicon.
 
 ```sh
 ./build.sh
@@ -202,8 +255,9 @@ open build/DragShot.app
 ```
 
 The build uses the existing “DragShot Local Signing” certificate when available, verifies the
-signature, and reports success. `./install.sh` installs a copy in Applications; quit a running
-copy before switching between installed and development builds.
+signature, and reports success. `./install.sh` installs a copy in Applications (or `~/Applications` if
+`/Applications` is not writable); quit a running copy before switching between installed and
+development builds.
 
 Modes:
 
@@ -243,6 +297,16 @@ while capture is pending, immediate submission cleanup, and multiline input. It 
 glass panel against light, dark, and colored backgrounds, then removes its capture and note.
 Evidence and a verdict are written to `$TMPDIR/dragshot-ux-tests/`. E2E changes the clipboard.
 Physical three-finger recognition and trackpad feel still need a hands-on check.
+
+The README image can be regenerated with the test-only clockwork:
+
+```sh
+./build.sh --tests
+build/tests/DragShot.app/Contents/MacOS/DragShot --readme-shot /path/to/wallpaper.png
+```
+
+It writes `readme-shot.png` under `$TMPDIR/dragshot-ux-tests/`. It uses sample content and
+contains no personal desktop data.
 
 ## Repository notes
 

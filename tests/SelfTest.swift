@@ -232,18 +232,18 @@ enum SelfTest {
             DSHSession(id: "a", title: "First session", cwd: "/tmp/ProjectA",
                        updatedAt: Date().timeIntervalSince1970 - 120,
                        lastPromptAt: Date().timeIntervalSince1970 - 120,
-                       running: true, blank: false),
+                       running: true),
             DSHSession(id: "b", title: "Second session", cwd: "/tmp/ProjectB",
                        updatedAt: Date().timeIntervalSince1970 - 7200,
                        lastPromptAt: Date().timeIntervalSince1970 - 7200,
-                       running: false, blank: false),
+                       running: false),
         ]
         let picker = SessionPickerWindow()
         picker.injectSessions(sessions, target: .recent)
         require(picker.testSummary.contains("visible=2"), "picker shows the injected sessions")
         require(picker.testSummary.contains("selected=1"), "recent target selects the newest session")
         picker.injectSessions(sessions, target: .new)
-        require(picker.testSummary.contains("selected=0"), "new target selects the New session row")
+        require(picker.testSummary.contains("selected=0"), "new target selects the New chat row")
         let view = picker.contentView!
         view.layoutSubtreeIfNeeded()
         let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds)!

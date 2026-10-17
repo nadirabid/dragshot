@@ -2,10 +2,9 @@
 name: install-dragshot
 description: >-
   Install or upgrade DragShot from its repository checkout: build and sign the
-  macOS app, install it in /Applications, install the dsh-dragshot Cordis
-  bridge, enable DSH sending, and hand off the Trackpad and privacy permission
-  steps. Use when the user asks to install, set up, or upgrade DragShot from
-  this repository.
+  macOS app, install it, install the dsh-dragshot Cordis bridge, enable DSH
+  sending, and hand off the Trackpad and privacy permission steps. Use when the
+  user asks to install, set up, or upgrade DragShot from this repository.
 ---
 
 # Install DragShot
@@ -22,27 +21,37 @@ this repository.
   ad-hoc signing, tell the user that permissions may need regranting after a
   rebuild.
 
-## Install
+## Get the checkout
 
-The README links this skill into `~/.dsh/skills`. Run its installer:
+If this skill is already linked at `~/.dsh/skills/install-dragshot`, resolve the
+checkout from it:
 
 ```sh
 SKILL="$HOME/.dsh/skills/install-dragshot"
 SKILL_DIR="$(cd "$SKILL" && pwd -P)"
 REPO="$(cd "$SKILL_DIR/../.." && pwd -P)"
-"$SKILL/scripts/install.sh" --workspace "<workspace>"
 ```
 
-If the skill was copied rather than symlinked, pass the checkout explicitly:
+If you were given only this skill file, clone the repository into a temporary
+directory:
 
 ```sh
-"$HOME/.dsh/skills/install-dragshot/scripts/install.sh" \
-  --repo "<checkout>" --workspace "<workspace>"
+REPO="$(mktemp -d /tmp/dragshot-install.XXXXXX)"
+git clone --depth 1 https://github.com/nadirabid/dragshot.git "$REPO"
 ```
 
-The installer builds, signs, installs to `/Applications`, installs the Cordis
-bridge, enables DSH sending, and opens DragShot. It is safe to rerun for an
-upgrade.
+If the checkout is somewhere else, ask the user for its path.
+
+## Install
+
+Run the wrapper from that checkout:
+
+```sh
+"$REPO/skills/install-dragshot/scripts/install.sh" --repo "$REPO" --workspace "<workspace>"
+```
+
+The installer builds, signs, installs the app, installs the Cordis bridge,
+enables DSH sending, and opens DragShot. It is safe to rerun for an upgrade.
 
 ## Finish
 
@@ -63,6 +72,6 @@ upgrade.
 
 - Do not grant TCC permissions or change trackpad settings programmatically.
   Those are user actions.
-- Do not run destructive commands outside the checkout and
-  `/Applications/DragShot.app`.
+- Do not run destructive commands outside the checkout and the installed
+  DragShot app.
 - Keep the workspace choice explicit.

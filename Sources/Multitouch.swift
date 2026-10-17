@@ -95,9 +95,4 @@ enum Multitouch {
         Log.write("multitouch: listening on \(devices.count) device(s)")
     }
 
-    static func stop() {
-        // Devices are stopped by the framework when the process exits; nothing to do beyond
-        // dropping our references.
-        devices.removeAll()
-    }
 }

@@ -254,7 +254,7 @@ if CommandLine.arguments.contains("--status") {
 }
 
 #if DRAGSHOT_TESTING
-// Clean README capture: the real AppKit glass UI, fake session data, and a
+// Clean README capture: the real AppKit glass UI and sample content over a
 // caller-supplied macOS wallpaper. No personal desktop content is included.
 if let index = CommandLine.arguments.firstIndex(of: "--readme-shot"),
    CommandLine.arguments.indices.contains(index + 1) {
@@ -262,108 +262,6 @@ if let index = CommandLine.arguments.firstIndex(of: "--readme-shot"),
     app.finishLaunching()
     ReadmeShot.run(backgroundPath: CommandLine.arguments[index + 1])
     app.run()
-}
-
-// Visual review path for the composer + picker. It uses the real DSH bridge
-// when available and captures the views directly, without ScreenCaptureKit.
-if CommandLine.arguments.contains("--picker-review") {
-    app.setActivationPolicy(.accessory)
-    app.finishLaunching()
-    let screen = NSScreen.main!
-    let image = NSImage(size: NSSize(width: 720, height: 420))
-    image.lockFocus()
-    NSColor(srgbRed: 0.96, green: 0.97, blue: 0.99, alpha: 1).setFill()
-    NSRect(x: 0, y: 0, width: 720, height: 420).fill()
-    ("Weekly overview" as NSString).draw(at: NSPoint(x: 40, y: 348), withAttributes: [
-        .font: NSFont.systemFont(ofSize: 30, weight: .semibold), .foregroundColor: NSColor.black,
-    ])
-    ("Activity over the last seven days" as NSString).draw(at: NSPoint(x: 40, y: 310), withAttributes: [
-        .font: NSFont.systemFont(ofSize: 18), .foregroundColor: NSColor.gray,
-    ])
-    image.unlockFocus()
-    guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-        exit(2)
-    }
-    DSHIntegration.shared.isEnabled = true
-    let panel = PanelWindow()
-    let rect = NSRect(x: screen.frame.minX + 180, y: screen.frame.minY + 200,
-                      width: 400, height: 220)
-    panel.present(near: rect, on: screen)
-    panel.attach(cgImage)
-    try? FileManager.default.createDirectory(at: SelfTest.output, withIntermediateDirectories: true)
-    print("review: panel presented")
-    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-        print("review: opening picker")
-        panel.presentSessionPicker()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            print("review: snapshotting")
-            let picker = NSApp.windows.compactMap { $0 as? SessionPickerWindow }.first
-            print("review: picker window", picker != nil)
-            func snapshot(_ view: NSView, name: String) {
-                let bounds = view.bounds
-                guard bounds.width > 0, bounds.height > 0,
-                      let rep = view.bitmapImageRepForCachingDisplay(in: bounds) else {
-                    print("review: no rep for", name); return
-                }
-                view.cacheDisplay(in: bounds, to: rep)
-                if let png = rep.representation(using: .png, properties: [:]) {
-                    do {
-                        try png.write(to: SelfTest.output.appendingPathComponent(name))
-                        print("review: wrote", name)
-                    } catch { print("review: write error", error) }
-                }
-            }
-            if let picker {
-                snapshot(picker.contentView!, name: "picker-view.png")
-            }
-            snapshot(panel.contentView!, name: "panel-view.png")
-            let union = panel.frame.union(picker?.frame ?? .zero).insetBy(dx: -28, dy: -28)
-            Task { @MainActor in
-                try? await E2E.screenshot(screen: screen, rect: union, name: "picker-live2.png")
-                print("review: screen captured")
-                exit(0)
-            }
-            // Fallback if ScreenCaptureKit is slow.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 8) {
-                print("review: capture timeout")
-                exit(0)
-            }
-        }
-    }
-    app.run()
-}
-
-// A tiny diagnostic path for the DSH adapter: send one existing PNG through
-// the real Unix-socket client without starting the gesture engine.
-if let sendIndex = CommandLine.arguments.firstIndex(of: "--dsh-send"),
-   sendIndex + 1 < CommandLine.arguments.count,
-   let source = NSImage(contentsOfFile: CommandLine.arguments[sendIndex + 1]),
-   let image = source.cgImage(forProposedRect: nil, context: nil, hints: nil) {
-    let text = sendIndex + 2 < CommandLine.arguments.count
-        ? CommandLine.arguments[sendIndex + 2]
-        : ""
-    app.setActivationPolicy(.accessory)
-    app.finishLaunching()
-    DSHIntegration.shared.isEnabled = true
-    if let socketIndex = CommandLine.arguments.firstIndex(of: "--dsh-socket"),
-       socketIndex + 1 < CommandLine.arguments.count {
-        DSHIntegration.shared.socketPathOverride = CommandLine.arguments[socketIndex + 1]
-    }
-    var finished = false
-    DSHIntegration.shared.send(image: image, text: text) { result in
-        switch result {
-        case .success(let sent):
-            print("OK session=\(sent.sessionID) created=\(sent.created) target=\(sent.target) title=\(sent.title ?? "")")
-        case .failure(let error):
-            print("ERROR \(error.localizedDescription)")
-        }
-        finished = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { exit(0) }
-    }
-    while !finished {
-        RunLoop.current.run(until: Date().addingTimeInterval(0.05))
-    }
-    exit(0)
 }
 
 if CommandLine.arguments.contains("--selftest") {
@@ -377,14 +275,6 @@ if CommandLine.arguments.contains("--selftest") {
 let delegate = AppDelegate()
 app.delegate = delegate
 DragShot.shared.hotkeyEnabled = CommandLine.arguments.contains("--hotkey")
-if CommandLine.arguments.contains("--dsh-enable") {
-    DSHIntegration.shared.isEnabled = true
-}
-if let socketIndex = CommandLine.arguments.firstIndex(of: "--dsh-socket"),
-   socketIndex + 1 < CommandLine.arguments.count {
-    DSHIntegration.shared.socketPathOverride = CommandLine.arguments[socketIndex + 1]
-    DSHIntegration.shared.isEnabled = true
-}
 #if DRAGSHOT_TESTING
 if CommandLine.arguments.contains("--e2e") {
     delegate.runE2EOnLaunch = true

@@ -7,9 +7,15 @@
 # both grants and costs a trip to System Settings. Signing with a real local certificate
 # gives a stable identity that survives rebuilds.
 #
-# Create the certificate once (see README) and the default below finds it. Passing
-# DRAGSHOT_SIGN_ID=- falls back to ad-hoc, which is fine for a build you never have to grant.
+# Create the certificate once (see DEVELOPMENT.md) and the default below finds it.
+# Passing DRAGSHOT_SIGN_ID=- falls back to ad-hoc, which is fine for a build you
+# never have to grant.
 set -euo pipefail
+
+command -v xcrun >/dev/null 2>&1 || {
+  echo "error: xcrun is required. Install Xcode Command Line Tools." >&2
+  exit 1
+}
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 APP="$ROOT/build/DragShot.app"
@@ -20,9 +26,54 @@ if [ "${1:-}" = "--tests" ]; then
   SOURCES+=("$ROOT"/tests/*.swift)
   SWIFT_FLAGS+=(-D DRAGSHOT_TESTING)
 fi
-SDK="/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk"
-TARGET="arm64-apple-macos26.0"
+SWIFTC="${DRAGSHOT_SWIFTC:-$(xcrun --find swiftc)}"
+TARGET="${DRAGSHOT_TARGET:-$(uname -m)-apple-macos26.0}"
 SIGN_ID="${DRAGSHOT_SIGN_ID:-DragShot Local Signing}"
+
+if [ ! -x "$SWIFTC" ]; then
+  echo "error: Swift compiler not found: $SWIFTC" >&2
+  echo "       install Xcode Command Line Tools." >&2
+  exit 1
+fi
+
+# Command Line Tools can ship an SDK newer than the bundled compiler. Probe the
+# available SDKs with this exact compiler and target instead of hardcoding one.
+PROBE="/tmp/dragshot-sdk-probe-$$.swift"
+printf 'import Foundation\n' > "$PROBE"
+trap 'rm -f "$PROBE"' EXIT
+try_sdk() {
+  [ -d "$1" ] && "$SWIFTC" -sdk "$1" -target "$TARGET" -typecheck "$PROBE" >/dev/null 2>&1
+}
+
+if [ -n "${DRAGSHOT_SDK:-}" ]; then
+  if ! try_sdk "$DRAGSHOT_SDK"; then
+    echo "error: SDK does not work with this compiler: $DRAGSHOT_SDK" >&2
+    exit 1
+  fi
+  SDK="$DRAGSHOT_SDK"
+else
+  CANDIDATES=()
+  DEFAULT_SDK="$(xcrun --sdk macosx --show-sdk-path 2>/dev/null || true)"
+  [ -n "$DEFAULT_SDK" ] && CANDIDATES+=("$DEFAULT_SDK")
+  while IFS= read -r sdk; do CANDIDATES+=("$sdk"); done < <(
+    ls -d /Library/Developer/CommandLineTools/SDKs/MacOSX*.sdk 2>/dev/null | sort -r
+  )
+  DEVELOPER="$(xcode-select -p 2>/dev/null || true)"
+  if [ -n "$DEVELOPER" ] && [ -d "$DEVELOPER/Platforms/MacOSX.platform/Developer/SDKs" ]; then
+    while IFS= read -r sdk; do CANDIDATES+=("$sdk"); done < <(
+      ls -d "$DEVELOPER/Platforms/MacOSX.platform/Developer/SDKs/MacOSX"*.sdk 2>/dev/null | sort -r
+    )
+  fi
+  SDK=""
+  for candidate in "${CANDIDATES[@]}"; do
+    if try_sdk "$candidate"; then SDK="$candidate"; break; fi
+  done
+  if [ -z "$SDK" ]; then
+    echo "error: no macOS SDK works with this Swift compiler." >&2
+    echo "       Install matching Xcode Command Line Tools, or set DRAGSHOT_SDK." >&2
+    exit 1
+  fi
+fi
 
 if [ "$SIGN_ID" != "-" ] && ! security find-identity -v -p codesigning 2>/dev/null | grep -qF "$SIGN_ID"; then
   echo "warning: signing identity '$SIGN_ID' not found; falling back to ad-hoc."
@@ -30,17 +81,12 @@ if [ "$SIGN_ID" != "-" ] && ! security find-identity -v -p codesigning 2>/dev/nu
   SIGN_ID="-"
 fi
 
-if [ ! -d "$SDK" ]; then
-  SDK="$(xcrun --sdk macosx --show-sdk-path)"
-  echo "note: falling back to SDK $SDK"
-fi
-
 echo "==> cleaning"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
-echo "==> compiling"
-swiftc \
+echo "==> compiling (target $TARGET, SDK $SDK)"
+"$SWIFTC" \
   -sdk "$SDK" \
   -target "$TARGET" \
   -framework Cocoa \

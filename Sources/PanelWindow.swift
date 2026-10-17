@@ -327,10 +327,6 @@ final class PanelWindow: NSPanel, NSTextViewDelegate, NSWindowDelegate {
     var testPickerVisible: Bool { isSessionPickerVisible }
     var testEditorFocused: Bool { firstResponder === textView }
 
-    func testTypeSlash() {
-        textView.insertText("/", replacementRange: NSRange(location: 0, length: 0))
-    }
-
     func testTypeSlashAsKeyEvent() {
         let timestamp = ProcessInfo.processInfo.systemUptime
         if let down = NSEvent.keyEvent(

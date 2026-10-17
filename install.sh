@@ -1,5 +1,5 @@
 #!/bin/bash
-# Install DragShot to /Applications as a real copy, not a symlink.
+# Install DragShot to /Applications (or ~/Applications) as a real copy, not a symlink.
 #
 # The system permission dialogs name the app by its path, and a symlink keeps reporting the
 # path it points at — which makes the thing you granted in System Settings hard to match to
@@ -8,7 +8,13 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 SRC="$ROOT/build/DragShot.app"
-DEST="/Applications/DragShot.app"
+DEST_DIR="${DRAGSHOT_INSTALL_DIR:-/Applications}"
+if [ ! -w "$DEST_DIR" ] && [ "$DEST_DIR" = "/Applications" ]; then
+  DEST_DIR="$HOME/Applications"
+  echo "note: /Applications is not writable; using $DEST_DIR"
+fi
+mkdir -p "$DEST_DIR"
+DEST="$DEST_DIR/DragShot.app"
 
 [ -d "$SRC" ] || { echo "no build at $SRC — run ./build.sh first"; exit 1; }
 

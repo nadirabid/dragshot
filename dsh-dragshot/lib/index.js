@@ -2,9 +2,9 @@
  * dsh-dragshot — a local capture bridge for the DSH desktop host.
  *
  * DragShot (the menu bar capture app) writes a screenshot and note to a Unix
- * socket. This plugin turns that into a real DSH session: it sends to the most
- * recently used session, or creates a new one in the most recent session's
- * directory (or the configured default).
+ * socket. This plugin turns that into a real DSH session: it sends to a chosen
+ * session, the most recently used session, or a new one in the most recent
+ * session's directory (or the configured default).
  *
  * Why a plugin: the running desktop host owns the live sessions. A separate
  * ACP process can list and resume persisted sessions, but it cannot attach to a
