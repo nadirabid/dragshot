@@ -104,6 +104,10 @@ echo
 echo "==> opening Lookit"
 open "$DEST"
 
+echo
+echo "==> checking Lookit diagnostics"
+"$REPO/skills/install-lookit/scripts/diagnose.sh" --app "$DEST" || true
+
 cat <<EOF
 
 Installed: $DEST

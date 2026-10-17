@@ -43,10 +43,10 @@ behavior it has for its own model calls is outside Lookit.
 - Captures and notes: `~/Pictures/Lookit/` (PNG plus the text note).
 - Settings: the `local.lookit` `UserDefaults` domain (enabled state, target session id/title,
   and whether to activate DSH after send).
-- Diagnostics: `~/Library/Logs/Lookit.log` and
-  `~/Library/Logs/LookitDshBridge.log`. These contain metadata such as method names, session
-  ids, image dimensions, and error descriptions; the bridge never logs note text or image
-  bytes.
+- Diagnostics: `~/Library/Application Support/Lookit/diagnostics.txt`,
+  `~/Library/Logs/Lookit.log`, and `~/Library/Logs/LookitDshBridge.log`. They contain the
+  app's permission and gesture state plus metadata such as method names, session ids, image
+  dimensions, and error descriptions; the bridge never logs note text or image bytes.
 - While DSH sending is enabled: `~/Library/Application Support/Lookit/dsh-bridge.json` and
   `dsh.sock`, plus the DSH profile's plugin row.
 - The captured image is copied to the system pasteboard.
@@ -272,6 +272,11 @@ Lookit when enabled. Normal launches leave the system shortcut alone.
 
 Log: `~/Library/Logs/Lookit.log`.
 
+The running app writes its current permission, event-tap, trackpad-reader, and three-finger
+drag settings to `~/Library/Application Support/Lookit/diagnostics.txt`. Use that file (or
+the menu's Copy Diagnostics item) for permission diagnostics. A `--status` run from a shell
+can inherit the terminal's TCC identity, so it is not authoritative for the running app.
+
 ## Verification
 
 Test-only code lives in `tests/` and is excluded from the normal app.
@@ -319,6 +324,7 @@ contains no personal desktop data.
 ## Files
 
     Sources/Lookit.swift          selection, capture, composition, and cleanup
+    Sources/Diagnostics.swift     local permission, event tap, trackpad, and log status
     Sources/EventTap.swift          gesture ownership and keyboard cancellation
     Sources/Multitouch.swift        three-finger recognition
     Sources/OverlayWindow.swift     transparent selection window
@@ -333,8 +339,10 @@ contains no personal desktop data.
     Sources/Storage.swift           PNG, note, and clipboard output
     Sources/DSHIntegration.swift    DSH socket client, launch, and status
     dsh-lookit/                   Cordis host bridge (plugin, protocol, installer, tests)
-    skills/install-lookit/        DSH install skill and its wrapper script
+    skills/install-lookit/        DSH install skill, wrapper, and diagnostics
     assets/lookit-example.png     README illustration
+    assets/Lookit-icon.png        official 1024 px icon source
+    assets/Lookit.icns            app icon used by Finder and System Settings
     tests/SelfTest.swift            geometry, event, and visual checks
     tests/E2E.swift                 system-event and capture integration checks
     tests/UITests.swift             dismissal, focus, multiline input, and material previews

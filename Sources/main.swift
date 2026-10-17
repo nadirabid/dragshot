@@ -10,6 +10,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         buildStatusItem()
         Lookit.shared.start()
+        Diagnostics.write()
+        Log.write("three-finger drag setting: \(Diagnostics.threeFingerDrag)")
 
         // Used once, on first run, to raise the two grants. Never automatic: launching the app
         // at login should not produce dialogs.
@@ -56,6 +58,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         threeFinger.isEnabled = false
         menu.addItem(threeFinger)
 
+        let dragStatus = NSMenuItem(
+            title: "Three-finger drag setting: \(Diagnostics.threeFingerDrag)",
+            action: nil, keyEquivalent: "")
+        dragStatus.isEnabled = false
+        menu.addItem(dragStatus)
+        menu.addItem(NSMenuItem(title: "Open Trackpad Settings…",
+                                action: #selector(openTrackpadSettings), keyEquivalent: ""))
+
         if Lookit.shared.hotkeyEnabled {
             let hotkey = NSMenuItem(title: "Debug trigger: ⌘⇧4", action: nil, keyEquivalent: "")
             hotkey.isEnabled = false
@@ -67,6 +77,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             action: nil, keyEquivalent: "")
         multitouch.isEnabled = false
         menu.addItem(multitouch)
+
+        let eventTap = NSMenuItem(
+            title: "Event tap: \(EventTap.isRunning ? "running" : "unavailable")",
+            action: nil, keyEquivalent: "")
+        eventTap.isEnabled = false
+        menu.addItem(eventTap)
 
         menu.addItem(.separator())
 
@@ -104,6 +120,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                 action: #selector(openFolder), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "Reveal Log",
                                 action: #selector(revealLog), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Copy Diagnostics",
+                                action: #selector(copyDiagnostics), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "Reveal Diagnostics",
+                                action: #selector(revealDiagnostics), keyEquivalent: ""))
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit Lookit",
                                 action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
@@ -113,6 +133,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.items.last?.target = NSApp
 
         statusItem?.menu = menu
+        Diagnostics.write()
     }
 
     /// The agent controls live beside the permission state, not in a second
@@ -228,6 +249,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func revealLog() {
         let url = URL(fileURLWithPath: Log.path)
         if FileManager.default.fileExists(atPath: Log.path) {
+            NSWorkspace.shared.activateFileViewerSelecting([url])
+        } else {
+            NSWorkspace.shared.open(url.deletingLastPathComponent())
+        }
+    }
+
+    @objc private func openTrackpadSettings() {
+        Diagnostics.openTrackpadSettings()
+    }
+
+    @objc private func copyDiagnostics() {
+        Diagnostics.write()
+        Diagnostics.copyToPasteboard()
+        Notice.show("Diagnostics copied.")
+    }
+
+    @objc private func revealDiagnostics() {
+        Diagnostics.write()
+        let url = URL(fileURLWithPath: Diagnostics.path)
+        if FileManager.default.fileExists(atPath: Diagnostics.path) {
             NSWorkspace.shared.activateFileViewerSelecting([url])
         } else {
             NSWorkspace.shared.open(url.deletingLastPathComponent())

@@ -4,6 +4,8 @@
 <dict>
 	<key>CFBundleName</key>
 	<string>Lookit</string>
+	<key>CFBundleIconFile</key>
+	<string>Lookit</string>
 	<key>CFBundleDisplayName</key>
 	<string>Lookit</string>
 	<key>CFBundleIdentifier</key>

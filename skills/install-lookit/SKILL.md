@@ -3,14 +3,15 @@ name: install-lookit
 description: >-
   Install or upgrade Lookit from its repository checkout: build and sign the
   macOS app, install it, install the dsh-lookit Cordis bridge, enable DSH
-  sending, and hand off the Trackpad and privacy permission steps. Use when the
-  user asks to install, set up, or upgrade Lookit from this repository.
+  sending, and verify Screen Recording, Accessibility, the event tap, the
+  Trackpad reader, the three-finger drag setting, and the bridge. Use when the
+  user asks to install, set up, upgrade, or diagnose Lookit.
 ---
 
 # Install Lookit
 
-Use this when the user asks to install or upgrade Lookit from a checkout of
-this repository.
+Use this when the user asks to install, upgrade, or diagnose Lookit from a
+checkout of this repository.
 
 ## Before you start
 
@@ -20,6 +21,9 @@ this repository.
 - Do not create signing certificates or enter keys. If the build falls back to
   ad-hoc signing, tell the user that permissions may need regranting after a
   rebuild.
+- Use the app's diagnostics file, not `--status` from a shell. macOS can
+  attribute a command-line launch to the terminal, so its TCC answers may not
+  describe the running Lookit app.
 
 ## Get the checkout
 
@@ -51,22 +55,82 @@ Run the wrapper from that checkout:
 ```
 
 The installer builds, signs, installs the app, installs the Cordis bridge,
-enables DSH sending, and opens Lookit. It is safe to rerun for an upgrade.
+enables DSH sending, opens Lookit, and prints the app's diagnostics. It is safe
+to rerun for an upgrade.
 
-## Finish
+## Verify permissions and gesture
 
-1. Grant **Screen Recording** and **Accessibility** when Lookit prompts. On
-   macOS 27, Accessibility is labelled **Device Control and Data Access**. The
-   app's menu status should show both permissions ready.
-2. Enable three-finger drag in **System Settings → Accessibility → Pointer
-   Control → Trackpad Options**: use the trackpad for dragging, and choose
-   Three Finger Drag.
-3. Confirm **Send captures to DSH** is on and the bridge says **Connected** in
-   Lookit's menu bar menu. If it says the bridge is not loaded, restart DSH
-   once and check again.
-4. Make a test capture and report whether it arrives in the chosen DSH session.
-   Do not claim success until the app is installed, permissions are ready, and
-   the test capture arrives.
+Run the diagnostics against the installed app (use the path the installer
+printed; normally `/Applications/Lookit.app`):
+
+```sh
+"$REPO/skills/install-lookit/scripts/diagnose.sh" --app "/Applications/Lookit.app"
+```
+
+The script reads the file written by the running app:
+`~/Library/Application Support/Lookit/diagnostics.txt`. Required core state:
+
+- **Screen Recording**: `true`
+- **Accessibility**: `true`
+- **Event tap**: `running`
+- **Trackpad reader**: `running`
+- **Three-finger drag setting**: `enabled`
+
+Do not treat the install as verified until these pass and the user has made a
+physical test capture.
+
+If a check fails, fix them in this order and rerun the script:
+
+1. **Screen Recording is false.** Open System Settings → Privacy & Security →
+   Screen Recording, enable Lookit, then quit and reopen Lookit.
+   ```sh
+   open "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
+   ```
+2. **Accessibility is false.** Open System Settings → Privacy & Security →
+   Accessibility. On macOS 27 this is **Device Control and Data Access**. Enable
+   Lookit, then quit and reopen it; the event tap is installed only at launch.
+   ```sh
+   open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+   ```
+3. **Event tap is false while both grants are true.** Quit and reopen Lookit
+   once. If it is still false, use **Copy Diagnostics** in Lookit's menu and
+   check `~/Library/Logs/Lookit.log`; do not guess.
+4. **Three-finger drag setting is disabled or unknown.** System Settings →
+   Accessibility → Pointer Control → Trackpad Options → Use trackpad for
+   dragging → **Three Finger Drag**. The setting is global, not per-app; Lookit
+   reads the raw trackpad contacts and needs the event tap for the gesture.
+   Quit and reopen Lookit after changing it.
+   ```sh
+   open "x-apple.systempreferences:com.apple.preference.universalaccess"
+   ```
+5. **Trackpad reader is unavailable.** Check the log and copy diagnostics. Do
+   not promise three-finger capture; report the failure plainly.
+6. **DSH bridge socket is missing.** Restart DSH once, then rerun the bridge
+   installer from `"$REPO/dsh-lookit/install.sh"`. The app still captures
+   locally while the bridge is absent.
+
+The app's menu also shows the same permission, event-tap, Trackpad, and
+three-finger state, opens the trackpad settings, and offers **Copy
+Diagnostics**, **Reveal Diagnostics**, and **Reveal Log**. The explicit
+`--request-permissions` launch argument raises the two system permission
+prompts; do not use it automatically at login.
+
+## Physical test
+
+Ask the user to drag three fingers across a region. Confirm that the composer
+opens, then make a capture and check that a new PNG appears in
+`~/Pictures/Lookit/` (and, when enabled, that it arrives in the chosen DSH
+session). Do not claim success until the physical gesture and delivery work.
+
+## If something goes wrong
+
+- Run `diagnose.sh` again and report the exact failing lines.
+- Read the latest lines of `~/Library/Logs/Lookit.log`; the app logs the
+  Multitouch reader, event tap, permissions, and three-finger setting at launch.
+- Use **Copy Diagnostics** in Lookit's menu for a complete local report. It
+  contains no captures or note text.
+- If the app is not running, open it and rerun. If diagnostics are missing,
+  quit and reopen the app before checking the log.
 
 ## Constraints
 
@@ -75,3 +139,5 @@ enables DSH sending, and opens Lookit. It is safe to rerun for an upgrade.
 - Do not run destructive commands outside the checkout and the installed
   Lookit app.
 - Keep the workspace choice explicit.
+- Do not claim success from installation alone; verify the diagnostics and the
+  physical test capture.

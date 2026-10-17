@@ -102,6 +102,7 @@ cp "$ROOT/Info.plist" "$APP/Contents/Info.plist"
 if compgen -G "$ROOT/Sources/*.png" > /dev/null; then
   cp "$ROOT"/Sources/*.png "$APP/Contents/Resources/"
 fi
+cp "$ROOT/assets/Lookit.icns" "$APP/Contents/Resources/Lookit.icns"
 
 echo "==> signing (identity: $SIGN_ID)"
 codesign --force --deep --sign "$SIGN_ID" \
