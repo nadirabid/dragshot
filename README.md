@@ -2,7 +2,9 @@
 
 Three finger snapshot anything to provide a reference to your agent.
 
-![Lookit composer over macOS 27 Golden Gate](assets/lookit-example.png)
+[![Capture a region, send feedback to the same DSH session, and see the updated UI](assets/lookit-demo.gif)](assets/lookit-demo.mp4)
+
+[Watch the 15-second demo in full quality](assets/lookit-demo.mp4).
 
 ## Install
 
