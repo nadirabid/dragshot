@@ -1,6 +1,6 @@
 import SwiftUI
 
-// System layout, typography, spacing and controls; only the quiet success tint is custom.
+// Native layout and controls with compact, consistently sized sidebar icon tiles.
 enum SettingsPage: Int, CaseIterable, Identifiable {
     case general, permissions, integration
     var id: Int { rawValue }
@@ -8,14 +8,14 @@ enum SettingsPage: Int, CaseIterable, Identifiable {
         switch self {
         case .general: return "General"
         case .permissions: return "Permissions"
-        case .integration: return "DeepSeek Harness"
+        case .integration: return "Harnesses"
         }
     }
     var symbol: String {
         switch self {
-        case .general: return "gearshape"
-        case .permissions: return "hand.raised"
-        case .integration: return "bubble.left.and.bubble.right"
+        case .general: return "gearshape.fill"
+        case .permissions: return "hand.raised.fill"
+        case .integration: return "square.grid.2x2.fill"
         }
     }
 }
@@ -25,7 +25,23 @@ struct LookitSettingsView: View {
     var body: some View {
         NavigationSplitView {
             List(SettingsPage.allCases, selection: $model.page) { page in
-                Label(page.title, systemImage: page.symbol).tag(page)
+                HStack(alignment: .center, spacing: 8) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .fill((page == .general ? Color.gray : page == .permissions ? Color.blue : Color.indigo).gradient)
+                        Image(systemName: page.symbol)
+                            .font(.system(size: 12, weight: .medium))
+                            .imageScale(.medium)
+                            .symbolRenderingMode(.monochrome)
+                            .foregroundStyle(.white)
+                            .fixedSize()
+                    }
+                    .frame(width: 20, height: 20)
+                    .accessibilityHidden(true)
+                    Text(page.title)
+                }
+                .frame(minHeight: 24)
+                .tag(page)
             }
             .navigationTitle("Lookit")
             .navigationSplitViewColumnWidth(min: 180, ideal: 200, max: 240)
@@ -91,22 +107,49 @@ private struct IntegrationSettings: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Send captures to DeepSeek Harness", isOn: Binding(get: { model.sending }, set: model.setSending))
-            } footer: { Text("Your captures and notes are also saved locally. Images are always copied to the clipboard.") }
+                Picker("Capture destination", selection: Binding(get: { model.harness }, set: model.setHarness)) {
+                    ForEach(Harness.allCases) { Text($0.title).tag($0) }
+                }
+            } footer: { Text("Choose one harness. Every capture is still saved locally and copied to the clipboard.") }
             Section {
+                LabeledContent("Connection", value: model.bridge)
                 Picker("Default destination", selection: Binding(get: { model.destination }, set: model.setDestination)) {
                     Text("Most recent chat").tag("recent")
                     Text("New chat").tag("new")
                     if model.destination == "session" { Text("Pinned: \(model.destinationTitle)").tag("session") }
                 }
-                Toggle("Open DeepSeek Harness after sending", isOn: Binding(get: { model.activateAfterSend }, set: model.setActivation))
-            } header: { Text("Sending") } footer: {
-                Text("To pin a specific chat, choose it in the destination picker while composing a capture.")
+                Toggle("Open after sending", isOn: Binding(get: { model.activateAfterSend }, set: model.setActivation))
+                HStack {
+                    Button("Open DeepSeek Harness", action: model.openDSH)
+                    Spacer()
+                    Button(model.installingBridge ? "Installing…" : "Set Up / Repair Bridge", action: model.repairBridge)
+                        .disabled(model.installingBridge)
+                }
+                if let message = model.bridgeInstallMessage {
+                    Text(message).font(.callout).foregroundStyle(.secondary)
+                }
+            } header: { Text("DeepSeek Harness") } footer: {
+                Text("Sends directly through the local bridge. Choose a specific chat in the capture composer.")
             }
-            .disabled(!model.sending)
-            Section("Connection") {
-                LabeledContent("Status", value: model.bridge)
-                Button("Open DeepSeek Harness", action: model.openDSH)
+            Section {
+                LabeledContent("Application", value: model.codexInstalled ? "Installed" : "Not installed")
+                LabeledContent("Workspace") {
+                    Text(model.codexWorkspace.isEmpty ? "Captures folder" : model.codexWorkspace)
+                        .lineLimit(1).truncationMode(.middle).help(model.codexWorkspace)
+                    Button("Choose…", action: model.chooseCodexWorkspace)
+                }
+                if !model.codexWorkspace.isEmpty { Button("Use Captures Folder", action: model.clearCodexWorkspace) }
+                Button("Open Codex") { model.openHarness(.codex) }
+                    .disabled(!model.codexInstalled)
+            } header: { Text("Codex") } footer: {
+                Text("Opens a new chat draft with your note and the saved screenshot path. Review and send in Codex. Paste the clipboard image if you want an attachment.")
+            }
+            Section {
+                LabeledContent("Application", value: model.cursorInstalled ? "Installed" : "Not installed")
+                Button("Open Cursor") { model.openHarness(.cursor) }
+                    .disabled(!model.cursorInstalled)
+            } header: { Text("Cursor") } footer: {
+                Text("Opens a prompt draft in Cursor’s current workspace with your note and the saved screenshot path. Review and send there; paste the clipboard image to attach it.")
             }
         }
         .formStyle(.grouped)

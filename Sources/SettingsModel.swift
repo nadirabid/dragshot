@@ -15,6 +15,12 @@ final class SettingsModel: ObservableObject {
     @Published private(set) var destinationTitle = DSHIntegration.shared.target.title
     @Published private(set) var bridge = DSHIntegration.shared.bridgeStatusText
     @Published private(set) var captureState = CaptureTestState.idle
+    @Published private(set) var harness = HarnessIntegration.destination
+    @Published private(set) var codexWorkspace = HarnessIntegration.codexWorkspace
+    @Published private(set) var codexInstalled = Harness.codex.appURL != nil
+    @Published private(set) var cursorInstalled = Harness.cursor.appURL != nil
+    @Published private(set) var installingBridge = false
+    @Published private(set) var bridgeInstallMessage: String?
     @Published var showPermissionHelp = false
     @Published var errorMessage: String?
     weak var window: NSWindow?
@@ -39,6 +45,10 @@ final class SettingsModel: ObservableObject {
         if !status.screen && captureState == .verified { captureState = .idle }
     }
     func refreshPreferences() {
+        if harness != HarnessIntegration.destination { harness = HarnessIntegration.destination }
+        if codexWorkspace != HarnessIntegration.codexWorkspace { codexWorkspace = HarnessIntegration.codexWorkspace }
+        if codexInstalled != (Harness.codex.appURL != nil) { codexInstalled = Harness.codex.appURL != nil }
+        if cursorInstalled != (Harness.cursor.appURL != nil) { cursorInstalled = Harness.cursor.appURL != nil }
         if loginEnabled != LaunchAtLogin.enabled { loginEnabled = LaunchAtLogin.enabled }
         if loginNeedsApproval != LaunchAtLogin.needsApproval { loginNeedsApproval = LaunchAtLogin.needsApproval }
         if loginDescription != LaunchAtLogin.description { loginDescription = LaunchAtLogin.description }
@@ -51,7 +61,43 @@ final class SettingsModel: ObservableObject {
     }
     private func changed() { refreshPreferences(); onChange?() }
     func toggleLogin() { LaunchAtLogin.toggle(); changed() }
-    func setSending(_ value: Bool) { DSHIntegration.shared.isEnabled = value; changed() }
+    func setSending(_ value: Bool) { setHarness(value ? .deepseek : .local) }
+    func setHarness(_ harness: Harness) {
+        HarnessIntegration.destination = harness
+        if harness == .deepseek && !DSHIntegration.shared.bridgeInstalled && Bundle.main.bundleIdentifier == "local.lookit" { repairBridge() }
+        changed()
+    }
+    func repairBridge() {
+        guard !installingBridge else { return }
+        installingBridge = true
+        bridgeInstallMessage = nil
+        DSHIntegration.shared.installBridge { [weak self] error in
+            guard let self else { return }
+            self.installingBridge = false
+            if let error { self.errorMessage = error.localizedDescription }
+            else { self.bridgeInstallMessage = "Bridge installed. Open DSH; if it is already running, restart it after current work finishes." }
+            self.changed()
+        }
+    }
+    func openHarness(_ harness: Harness) {
+        HarnessIntegration.openApp(harness) { [weak self] error in
+            if let error { self?.errorMessage = error.localizedDescription }
+        }
+    }
+    func chooseCodexWorkspace() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Choose Workspace"
+        guard let window else { return }
+        panel.beginSheetModal(for: window) { [weak self] response in
+            guard response == .OK, let url = panel.url else { return }
+            HarnessIntegration.codexWorkspace = url.path
+            self?.changed()
+        }
+    }
+    func clearCodexWorkspace() { HarnessIntegration.codexWorkspace = ""; changed() }
     func setActivation(_ value: Bool) { DSHIntegration.shared.activateAfterSend = value; changed() }
     func setDestination(_ value: String) {
         if value == "recent" { DSHIntegration.shared.target = .recent }

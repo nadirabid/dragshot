@@ -7,6 +7,7 @@ struct DSHSendResult {
     let title: String?
     let created: Bool
     let target: String
+    let opened: Bool
 }
 
 /// One session as exposed by the DSH bridge. `updatedAt` and `lastPromptAt`
@@ -95,6 +96,9 @@ final class DSHIntegration {
         case appNotRunning
         case bridgeMissing
         case notInstalled
+        case checking
+        case navigationMissing
+        case outdated
     }
 
     private enum Key {
@@ -112,6 +116,9 @@ final class DSHIntegration {
 
     private let defaults = UserDefaults.standard
     private let workQueue = DispatchQueue(label: "lookit.dsh", qos: .utility)
+
+    private var healthCheckInFlight = false
+    private var health: BridgeState = .checking
 
     private init() {
         if defaults.string(forKey: Key.target) == nil {
@@ -187,7 +194,7 @@ final class DSHIntegration {
 
     var bridgeState: BridgeState {
         guard Self.appURL != nil else { return .notInstalled }
-        if discoverySocketPath() != nil { return .ready }
+        if discoverySocketPath() != nil { return health }
         if !isDSHRunning { return .appNotRunning }
         return .bridgeMissing
     }
@@ -196,12 +203,68 @@ final class DSHIntegration {
         switch bridgeState {
         case .ready:
             return "Connected"
+        case .checking:
+            return "Checking connection…"
+        case .navigationMissing:
+            return "Connected · open DSH to enable chat navigation"
+        case .outdated:
+            return "Bridge updated · restart DSH to finish"
         case .appNotRunning:
             return "DSH not running (opens on send)"
         case .bridgeMissing:
             return "Not loaded — restart DSH once"
         case .notInstalled:
             return "Not installed"
+        }
+    }
+
+    /// Probe the actual protocol; a leftover socket alone is not readiness.
+    func refreshHealth() {
+        guard !healthCheckInFlight else { return }
+        guard let socket = discoverySocketPath() else { health = .checking; return }
+        healthCheckInFlight = true
+        DispatchQueue.global(qos: .utility).async {
+            let next: BridgeState
+            do {
+                let result = try UnixSocketClient.request(socketPath: socket, method: "hello", params: [:], timeout: 2)
+                if result["plugin"] as? String != "dsh-lookit" || result["version"] as? String != "0.4.0" {
+                    next = .outdated
+                } else {
+                    next = result["navigationReady"] as? Bool == true ? .ready : .navigationMissing
+                }
+            } catch { next = .bridgeMissing }
+            DispatchQueue.main.async { self.health = next; self.healthCheckInFlight = false }
+        }
+    }
+
+    var bridgeInstalled: Bool {
+        let path = Self.discoveryURL.deletingLastPathComponent()
+            .appendingPathComponent("Integrations/dsh-lookit/lib/index.js").path
+        return FileManager.default.fileExists(atPath: path)
+    }
+
+    /// Uses the bundled payload, so repair also works after deleting the checkout.
+    func installBridge(completion: @escaping (Error?) -> Void) {
+        guard let installer = Bundle.main.resourceURL?.appendingPathComponent("DSHBridge/install.sh"),
+              FileManager.default.fileExists(atPath: installer.path) else {
+            completion(DSHIntegrationError.bridgeUnavailable("The bundled bridge installer is missing. Reinstall Lookit."))
+            return
+        }
+        workQueue.async {
+            do {
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/bin/bash")
+                process.arguments = [installer.path, FileManager.default.homeDirectoryForCurrentUser.path]
+                let pipe = Pipe()
+                process.standardOutput = pipe
+                process.standardError = pipe
+                try process.run()
+                let output = pipe.fileHandleForReading.readDataToEndOfFile()
+                process.waitUntilExit()
+                let error: Error? = process.terminationStatus == 0 ? nil : DSHIntegrationError.bridgeUnavailable(
+                    String(data: output, encoding: .utf8) ?? "Could not install the DSH bridge.")
+                DispatchQueue.main.async { self.refreshHealth(); completion(error) }
+            } catch { DispatchQueue.main.async { completion(error) } }
         }
     }
 
@@ -262,7 +325,7 @@ final class DSHIntegration {
 
             guard let socket = self.waitForSocket(timeout: wasRunning ? 3.0 : 20.0) else {
                 let message = wasRunning
-                    ? "DSH is running, but its Lookit bridge is not loaded. Restart DSH once to load the plugin."
+                    ? "DSH is running, but its Lookit bridge is not loaded. Use Set Up / Repair Bridge in Lookit Settings → Harnesses, then restart DSH."
                     : "DSH did not finish starting in time."
                 DispatchQueue.main.async {
                     completion(.failure(DSHIntegrationError.bridgeUnavailable(message)))
@@ -277,6 +340,7 @@ final class DSHIntegration {
                 "imageMediaType": "image/png",
                 "imageName": "lookit.png",
                 "mode": "queue",
+                "openAfterSend": activateAfterSend,
             ]
             if case .session(let id, _) = target {
                 params["sessionId"] = id
@@ -295,7 +359,8 @@ final class DSHIntegration {
                     sessionID: sessionID,
                     title: result["title"] as? String,
                     created: result["created"] as? Bool ?? false,
-                    target: result["target"] as? String ?? target.kind
+                    target: result["target"] as? String ?? target.kind,
+                    opened: result["opened"] as? Bool ?? false
                 )
                 Log.write("sent to DSH session \(sessionID) (\(sent.created ? "new" : "existing"))")
                 DispatchQueue.main.async {
@@ -336,7 +401,7 @@ final class DSHIntegration {
             guard let socket = self.waitForSocket(timeout: 2.0) else {
                 DispatchQueue.main.async {
                     completion(.failure(DSHIntegrationError.bridgeUnavailable(
-                        "DSH's Lookit bridge is not loaded. Restart DSH once.")))
+                        "DSH's bridge is not loaded. Use Set Up / Repair Bridge in Settings → Harnesses.")))
                 }
                 return
             }
@@ -416,6 +481,8 @@ private enum UnixSocketClient {
             throw DSHIntegrationError.socket("socket() failed: \(errnoText())")
         }
         defer { close(descriptor) }
+        var noSignal: Int32 = 1
+        setsockopt(descriptor, SOL_SOCKET, SO_NOSIGPIPE, &noSignal, socklen_t(MemoryLayout<Int32>.size))
 
         var timeoutValue = timeval(tv_sec: Int(timeout), tv_usec: 0)
         setsockopt(descriptor, SOL_SOCKET, SO_RCVTIMEO, &timeoutValue,

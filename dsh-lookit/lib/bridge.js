@@ -71,6 +71,9 @@ export class LookitBridge {
 
     constructor({
         sessionController,
+        workspaceRegistry,
+        navigationReady,
+        reveal,
         socketPath = join(homedir(), 'Library', 'Application Support', 'Lookit', 'dsh.sock'),
         discoveryPath = join(homedir(), 'Library', 'Application Support', 'Lookit', 'dsh-bridge.json'),
         logPath = join(homedir(), 'Library', 'Logs', 'LookitDshBridge.log'),
@@ -88,6 +91,9 @@ export class LookitBridge {
             throw new TypeError('LookitBridge: socketPath is required')
         }
         this.sessionController = sessionController
+        this.workspaceRegistry = workspaceRegistry
+        this.reveal = reveal
+        this.navigationReady = navigationReady
         this.socketPath = socketPath
         this.discoveryPath = discoveryPath
         this.logPath = logPath
@@ -247,13 +253,20 @@ export class LookitBridge {
                 return {
                     protocol: PROTOCOL,
                     plugin: 'dsh-lookit',
+                    version: '0.4.0',
+                    navigationReady: this.navigationReady?.() === true,
                     pid: process.pid,
-                    methods: ['hello', 'ping', 'list', 'send'],
+                    methods: ['hello', 'ping', 'list', 'send', 'reveal'],
                 }
             case 'ping':
                 return { pong: true, now: Date.now() }
             case 'list':
                 return { items: await this.listSessions() }
+            case 'reveal': {
+                const items = await this.listSessions()
+                if (!items.some(item => item.sessionId === params?.sessionId)) throw new BridgeError('session_not_found', 'Session not found.')
+                return { opened: await this.reveal?.(params.sessionId) ?? false }
+            }
             case 'send':
                 return await this.#sendCapture(params ?? {})
             default:
@@ -301,7 +314,8 @@ export class LookitBridge {
 
         if (sessionId === null) {
             const cwd = await this.#resolveCwd(params.cwd ?? candidates[0]?.cwd)
-            const value = await this.sessionController.create({ cwd })
+            const workspace = this.workspaceRegistry?.list().find(item => resolve(item.path) === cwd)
+            const value = await this.sessionController.create(workspace ? { workspaceId: workspace.id } : { cwd })
             if (typeof value?.sessionId !== 'string' || value.sessionId.length === 0) {
                 throw new BridgeError('session_create_failed',
                     'DSH created no session for this capture.')
@@ -330,7 +344,14 @@ export class LookitBridge {
         }, AbortSignal.timeout(this.promptTimeoutMs))
 
         this.#log(`sent session=${sessionId} target=${target} image=${image?.bytes ?? 0}B text=${text.length}c`)
-        return { sessionId, title, created, target }
+        // Prompt admission succeeded. A navigation failure must never encourage
+        // retrying the prompt (which would submit the image twice).
+        let opened = false
+        if (params.openAfterSend === true) {
+            try { opened = await this.reveal?.(sessionId) ?? false }
+            catch (error) { this.#log(`navigation failed: ${error.message}`) }
+        }
+        return { sessionId, title, created, target, opened }
     }
 
     #parseImage(params) {

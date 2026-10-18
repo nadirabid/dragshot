@@ -1,6 +1,6 @@
 {
   "name": "dsh-lookit",
-  "version": "0.2.0",
+  "version": "0.4.0",
   "private": true,
   "description": "Local Lookit bridge for DeepSeek Harness: accepts a screenshot and note and sends them to a chosen, new, or most recently used DSH session.",
   "type": "module",
@@ -9,21 +9,29 @@
     ".": {
       "default": "./lib/index.js"
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./client": {
+      "default": "./lib/client.js"
+    }
   },
   "files": [
     "lib/index.js",
     "lib/bridge.js",
     "cordis.patch.yml",
-    "README.md"
+    "README.md",
+    "lib/client.js",
+    "lib/navigation.js"
   ],
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-workspace",
+        "@deepseek-ai/dsh-api-session-controller"
+      ],
+      "platform": "web"
     }
-  },
-  "peerDependencies": {
-    "@deepseek-ai/cordis": "~4.0.5",
-    "@deepseek-ai/schemastery": "~3.18.4"
   }
 }

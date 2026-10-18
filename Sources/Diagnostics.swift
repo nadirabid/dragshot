@@ -42,6 +42,8 @@ enum Diagnostics {
         event tap: \(EventTap.isRunning)
         multitouch: \(Multitouch.isAvailable)
         three-finger drag: \(threeFingerDrag)
+        harness: \(HarnessIntegration.destination.rawValue)
+        open after sending: \(DSHIntegration.shared.activateAfterSend)
         captures: \(Storage.directory)
         log: \(Log.path)
         """

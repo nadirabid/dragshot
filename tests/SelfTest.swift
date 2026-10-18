@@ -34,6 +34,7 @@ enum SelfTest {
         pickerRendering()
         pickerTrigger()
         setupRendering()
+        harnessRouting()
         print("PASS: coordinates, event suppression, Escape, transparent rendering at 1x/2x, live view, panel, picker, slash trigger")
         print("Visual evidence: \(output.path)")
     }
@@ -256,10 +257,12 @@ enum SelfTest {
     private static func setupRendering() {
         let setup = SettingsWindow()
         let integration = DSHIntegration.shared
+        let originalHarness = UserDefaults.standard.string(forKey: "harness.destination")
         let originalTarget = integration.target
         let originalSending = integration.isEnabled
         let originalActivation = integration.activateAfterSend
         defer {
+            UserDefaults.standard.set(originalHarness, forKey: "harness.destination")
             integration.target = originalTarget
             integration.isEnabled = originalSending
             integration.activateAfterSend = originalActivation
@@ -329,4 +332,40 @@ enum SelfTest {
         }
         setup.close()
     }
+    private static func harnessRouting() {
+        let previous = UserDefaults.standard.string(forKey: "harness.destination")
+        let enabled = DSHIntegration.shared.isEnabled
+        defer {
+            UserDefaults.standard.set(previous, forKey: "harness.destination")
+            DSHIntegration.shared.isEnabled = enabled
+        }
+        UserDefaults.standard.removeObject(forKey: "harness.destination")
+        DSHIntegration.shared.isEnabled = true
+        require(HarnessIntegration.destination == .deepseek, "legacy DSH users retain their destination")
+        DSHIntegration.shared.isEnabled = false
+        require(HarnessIntegration.destination == .local, "legacy local-only users remain local")
+        for destination in [Harness.codex, .cursor, .local, .deepseek] {
+            HarnessIntegration.destination = destination
+            require(HarnessIntegration.destination == destination, "harness choice persists")
+            require(HarnessIntegration.usesDSH == (destination == .deepseek), "only the selected harness receives captures")
+        }
+        let capture = SavedCapture(name: "test.png", pngURL: URL(fileURLWithPath: "/tmp/Lookit test & +/image.png"),
+                                   noteURL: URL(fileURLWithPath: "/tmp/Lookit test & +/note.txt"))
+        do {
+            for harness in [Harness.codex, .cursor] {
+                let text = "Fix a+b & c? # UI 🌱\nNext line"
+                let url = try HarnessIntegration.draftURL(for: harness, capture: capture, text: text)
+                let items = URLComponents(url: url, resolvingAgainstBaseURL: false)!.queryItems!
+                require(items.first!.value!.contains(text), "draft preserves Unicode and URL punctuation")
+                require(items.first!.value!.contains(capture.pngURL.path), "draft references the saved image")
+                require(!url.absoluteString.contains("+"), "form URL decoders must not convert plus signs to spaces")
+                require(url.scheme == harness.scheme, "handoff stays in the local app scheme")
+                let long = try HarnessIntegration.draftURL(for: harness, capture: capture, text: String(repeating: "🌱", count: 12000))
+                require(long.absoluteString.count <= 10000, "large prompts respect URL limits")
+                let fallback = URLComponents(url: long, resolvingAgainstBaseURL: false)!.queryItems!.first!.value!
+                require(fallback.contains(capture.noteURL.path), "large prompts retain their complete saved note")
+            }
+        } catch { require(false, "draft URL creation failed: \(error)") }
+    }
+
 }

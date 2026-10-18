@@ -22,7 +22,7 @@ ln -sfn "$PWD/skills/install-lookit" ~/.dsh/skills/install-lookit
 ```
 
 Then ask DSH to install Lookit from this repo. The skill builds and installs the app, sets up
-the Cordis bridge, enables DSH sending, and hands off the permission and three-finger trackpad
+the Cordis bridge when a profile exists, preserves user preferences, and hands off the permission and three-finger trackpad
 steps. Restart DSH once if the skill does not appear in the catalog.
 
 The skill's wrapper is `skills/install-lookit/scripts/install.sh`; it is safe to rerun for an
@@ -30,7 +30,7 @@ upgrade. The manual build path is below.
 
 ## Privacy
 
-Lookit collects no data and has no network client. No account, analytics, telemetry,
+Lookit adds no remote data collection or remote network client. No account, analytics, telemetry,
 crash reporter, API key, or remote service is involved. Everything the app and its local
 bridge do happens on the Mac.
 
@@ -55,15 +55,15 @@ None of these are uploaded or collected by Lookit.
 
 ### Network audit
 
-- No `URLSession`, `URLRequest`, `NSURLConnection`, `NWConnection`, WebSocket, HTTP client, or
-  `fetch` in `Sources/` or `dsh-lookit/lib/`.
+- Native capture delivery uses a local Unix socket. The DSH client companion uses
+  the host transport for its local navigation acknowledgement route.
 - The app links Cocoa, ScreenCaptureKit, ApplicationServices, ImageIO, and their system
   dependencies; no CFNetwork/Network framework.
 - The DSH client uses `AF_UNIX`/`SOCK_STREAM`; the plugin uses `node:net` to `listen` on a Unix
   socket path, not a TCP port.
 - The signed app has no entitlements, including no network entitlement.
-- The app has no third-party dependencies. The bridge's only peer dependencies are DSH host
-  packages that DSH already provides.
+- The app and bridge have no third-party package dependencies. The bridge uses
+  services injected by DSH and Node built-ins.
 
 ### Verification
 
@@ -77,7 +77,7 @@ codesign -d --entitlements :- build/Lookit.app
 wc -l Sources/*.swift dsh-lookit/lib/*.js
 ```
 
-At the time of the audit the network search returns no matches, `otool` shows no
+The client navigation route uses the DSH host transport; `otool` shows no
 CFNetwork/Network dependency, the entitlements output is empty, and the app plus bridge are
 under 4,000 lines. The plugin listens only on its Unix socket. These are source and build checks, not browser-visible claims in a separate dashboard.
 
@@ -137,7 +137,7 @@ Shortcuts while composing:
 - `/` opens it when the message is empty and the caret is at the start; the slash is consumed.
 - A slash after text remains literal.
 
-Settings → DeepSeek Harness can switch back to **Most recent** or **New chat**, which clears a pin.
+Settings → Harnesses can switch back to **Most recent** or **New chat**, which clears a pin.
 When DSH is disabled the target dock is hidden and Return behaves as a local-only capture.
 
 ### Architecture
@@ -166,7 +166,7 @@ cd dsh-lookit
 ./install.sh /path/to/default/workspace
 ```
 
-The installer links the plugin into `~/.dsh/profiles/node_modules/dsh-lookit` and appends one
+The installer copies the dependency-free plugin into Application Support and links it into `~/.dsh/profiles/node_modules/dsh-lookit` and appends one
 `lookit-bridge` row to the desktop profile's `cordis.patch.yml`. It leaves the DSH app bundle
 untouched. If DSH is already running, its HMR watcher normally loads the row; if the menu says
 “DSH bridge: Not loaded”, restart DSH once:
@@ -177,7 +177,7 @@ sleep 2
 open -a "DeepSeek Harness"
 ```
 
-Then enable **Send captures to DeepSeek Harness** in Settings → DeepSeek Harness.
+Then choose **DeepSeek Harness** as the capture destination in Settings → Harnesses.
 
 ### Known limits
 
@@ -383,7 +383,7 @@ cp build/Lookit.iconset/icon_512x512@2x.png assets/Lookit-icon.png
 ## Settings and login items
 
 The menu bar contains Settings, Configure Permissions, Launch at Login, and Quit. The single
-Settings window uses a SwiftUI navigation sidebar with General, Permissions, and DeepSeek Harness. General holds
+Settings window uses a SwiftUI navigation sidebar with General, Permissions, and Harnesses. General holds
 local capture and diagnostic actions; the integration page holds sending, default
 destination, activation, and connection status. Existing preferences are preserved.
 
@@ -395,3 +395,57 @@ The window contents use SwiftUI `NavigationSplitView` and grouped `Form` section
 `SettingsModel` owns observable state and forwards actions to the existing services;
 `SettingsWindow` handles the accessory application's window lifecycle. `AppDragView`
 is the small AppKit bridge for native file dragging from an inactive window.
+
+## Harness destinations
+
+Settings → Harnesses selects one destination: local-only, DeepSeek Harness, Codex,
+or Cursor. Existing installations retain their previous DSH/local behavior until
+a destination is chosen. DSH keeps its direct local-bridge send and chat picker.
+
+Codex and Cursor open a reviewable prompt draft through their documented local app
+links. The note includes the saved PNG path, and the PNG remains on the clipboard
+for pasting as an attachment. These handoffs do not auto-submit or claim to upload
+an image. Codex can use a chosen workspace (the captures directory by default);
+Cursor uses its current workspace. Long notes are referenced by their saved file
+path to keep encoded URLs below 10,000 characters. No shell or remote URL relay is used.
+
+References: [Codex deep links](https://learn.chatgpt.com/docs/reference/commands)
+and [Cursor deep links](https://cursor.com/docs/reference/deeplinks).
+
+
+### DSH delivery and navigation regression (2026-10-17)
+
+Repaired the missing plugin dependency link after the checkout move, and updated
+installation to refresh existing bridge links. DSH was accepting captures but
+leaving the old chat open; new sessions created with only `cwd` were also outside
+the workspace list. New sessions now use the matching workspace ID, and the
+plugin's client companion refreshes/selects the accepted session, with an
+acknowledgement before reporting it opened. Navigation failure never retries a
+successfully admitted prompt.
+
+Validation: `node --test dsh-lookit/test/*.test.mjs`, native self-tests, and the
+opt-in `tests/live/run-dsh.sh --send-test` production Swift sender. Live test chat
+`session-8c5c98c7-5c19-479e-b294-b9053652d505` appeared selected in the DeepSeek
+workspace; the visible attachment was read correctly as `LOOKIT DSH 7F3A` and a
+green square. This covers native sender → socket → real DSH session → selection
+→ visible response, independently of trackpad gesture detection.
+
+
+## Installation regression coverage
+
+The root `install.sh` owns installation; the skill wrapper only builds and invokes it.
+The signed app includes a self-contained DSHBridge payload and Settings repair action.
+Existing preferences and signing identity are preserved. A different signing requirement
+is rejected before replacing the app unless explicitly allowed. Bridge updates preserve
+profile configuration and remain usable after deleting the source checkout.
+
+`python3 -m unittest discover -s tests -p 'test_install.py' -v` exercises staged
+app installs, repeat upgrades, damaged signatures, signing changes, and fresh DSH
+registration. `node --test dsh-lookit/test/*.test.mjs` covers bridge installation,
+protocol and client selection. No normal test submits a real model prompt.
+
+The default install opens the installed app and runs `scripts/check-install.py`.
+Exit 2 means installation succeeded but readiness needs attention. The checker
+requires fresh diagnostics from the installed process and a live DSH host/client
+when selected. `--no-open` explicitly skips this verification. The physical
+trackpad gesture and macOS permission approvals remain separate user checks.

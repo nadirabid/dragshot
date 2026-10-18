@@ -23,42 +23,20 @@ as the UI and can call `ctx.sessionController` directly.
 ./install.sh /path/to/default/workspace
 ```
 
-The script:
+The installer copies the complete dependency-free host and client payload to
+`~/Library/Application Support/Lookit/Integrations/dsh-lookit` and links that
+stable location into `~/.dsh/profiles/node_modules/dsh-lookit`. Moving or deleting
+the checkout cannot break the installed integration. Existing configuration is
+preserved, legacy rows are migrated, and incomplete payloads are rejected.
 
-- links this package into `~/.dsh/profiles/node_modules/dsh-lookit`;
-- appends one `insert` row for `dsh-lookit` to the profile's
-  `cordis.patch.yml`;
-- leaves the DSH app bundle untouched.
+For a complete app installation, use the repository root installer. The signed
+app bundles this same bridge installer; Settings → Harnesses → Set Up / Repair
+Bridge works without a checkout. A DSH profile must first have been initialized
+by opening DSH. The installer does not initialize profiles or change the selected
+harness. Restart DSH after its active work finishes if a new client has not loaded.
 
-The desktop profile has HMR enabled, so a running DSH usually loads the new row
-when the patch file changes. If that does not happen, restart DSH once:
-
-```sh
-osascript -e 'quit app "DeepSeek Harness"'
-sleep 2
-open -a "DeepSeek Harness"
-```
-
-During development the profile can also carry an HMR root watch so edits to
-`lib/bridge.js` reload the bridge without restarting DSH:
-
-```yaml
-- id: hmr
-  config:
-    root: ["/path/to/lookit/dsh-lookit"]
-```
-
-The install script does not add this row; it is a development convenience, not
-part of the integration.
-
-Then enable **Send captures to DSH** in Lookit's menu bar menu.
-
-Check that the bridge is up:
-
-```sh
-ls -l "$HOME/Library/Application Support/Lookit/dsh-bridge.json"
-ls -l "$HOME/Library/Application Support/Lookit/dsh.sock"
-```
+Check readiness with `skills/install-lookit/scripts/diagnose.sh` from the root.
+It checks a live handshake and client heartbeat, not just socket-file existence.
 
 ## Protocol
 
@@ -105,7 +83,7 @@ frontmost document.
 Run the tests with:
 
 ```sh
-node --test test/bridge.test.mjs
+node --test test/*.test.mjs
 ```
 
 ## Diagnosis
@@ -121,13 +99,33 @@ from Lookit's log at `~/Library/Logs/Lookit.log`.
 
 ## Limitations
 
-- A newly created session is not auto-selected in the DSH window. The app is
-  activated after sending; the session is visible in the sidebar. Selecting the
-  new session automatically needs a client-side focus event or a DSH session
-  deep link, which is the next step.
+- With Open after sending enabled, the client companion refreshes the session
+  list and selects the accepted chat. The bridge reports `opened: true` only
+  after the UI acknowledges that selection. Delivery remains successful if
+  navigation times out; Lookit does not resend the prompt.
+- New sessions use the matching DSH workspace when its path matches the chosen
+  directory; otherwise they appear under Ungrouped.
 - The bridge is local-only and trusts processes running as the same user. That is
   the same trust boundary as the agent's own shell.
 - The app reads the session list when its picker opens; the list does not live-update
   while the picker is visible.
 - The DSH plugin uses the host `sessionController`; a future DSH version that
   changes those method shapes must update `lib/bridge.js`.
+
+## Live validation (opt-in)
+
+From the repository root, run:
+
+```sh
+LOOKIT_SDK=/Library/Developer/CommandLineTools/SDKs/MacOSX26.sdk bash tests/live/run-dsh.sh --send-test
+```
+
+This creates one real chat using the production Swift sender and an image
+containing `LOOKIT DSH 7F3A` and a green square. It fails unless the host creates
+and the client selects the chat. Check the visible attachment and the response
+reading the marker and square color to validate model receipt too. This is not
+part of the default unit suite and does not test the physical trackpad gesture.
+
+The default tests cover socket protocol, workspace association, successful and
+failed navigation, stale acknowledgements, client selection verification, and
+self-contained fresh installs, upgrades, legacy migration, and incomplete payloads.

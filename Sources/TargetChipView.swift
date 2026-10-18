@@ -83,6 +83,15 @@ final class TargetChipView: NSView {
         fatalError("TargetChipView is constructed programmatically")
     }
 
+    func configure(harness: Harness) {
+        agentLabel.stringValue = harness == .deepseek ? "DSH" : harness.title
+        whale.image = harness == .deepseek ? BrandAssets.whale : harness.appURL.map { NSWorkspace.shared.icon(forFile: $0.path) }
+        whale.contentTintColor = nil
+        whale.setAccessibilityLabel(harness.title)
+        chevron.isHidden = harness != .deepseek
+        setAccessibilityRole(harness == .deepseek ? .button : .staticText)
+    }
+
     var title: String {
         get { titleLabel.stringValue }
         set {

@@ -59,7 +59,7 @@ final class Lookit {
         }
         EventTap.onTogglePicker = { [weak self] in
             guard let self, self.state == .composing, let panel = self.panel,
-                  DSHIntegration.shared.isEnabled else { return false }
+                  HarnessIntegration.usesDSH else { return false }
             if panel.isSessionPickerVisible {
                 panel.dismissSessionPicker()
             } else {
@@ -104,7 +104,7 @@ final class Lookit {
         guard Permissions.hasScreenRecording,
               let screen = NSScreen.screens.first(where: { NSMouseInRect(point, $0.frame, false) }) else {
             reset()
-            Notice.show("Lookit needs Screen Recording — open Setup & Permissions from the menu bar")
+            Notice.show("Lookit needs Screen Recording — open Configure Permissions from the menu bar")
             return
         }
         generation += 1
@@ -227,14 +227,20 @@ final class Lookit {
             let saved = try Storage.save(image: image, text: text)
             try Storage.copyToPasteboard(image: image)
             Log.write("saved \(saved.name) (\(image.width)x\(image.height))")
-            if DSHIntegration.shared.isEnabled {
+            let harness = HarnessIntegration.destination
+            if harness == .codex || harness == .cursor {
+                HarnessIntegration.openDraft(harness, capture: saved, text: text) { error in
+                    if let error { Notice.show("Saved locally — \(error.localizedDescription)") }
+                    else { Notice.show("Opened \(harness.title) draft · review and send there") }
+                }
+            } else if HarnessIntegration.usesDSH {
                 DSHIntegration.shared.send(image: image, text: text) { result in
                     switch result {
                     case .success(let sent):
                         let suffix = sent.title.flatMap { $0.isEmpty ? nil : " · \($0)" } ?? ""
-                        Notice.show(sent.created
-                            ? "Sent to new DSH session"
-                            : "Sent to DSH\(suffix)")
+                        Notice.show(sent.opened
+                            ? "Sent · opened DSH chat\(suffix)"
+                            : "Sent to DSH\(suffix) · find it in the session list")
                     case .failure(let error):
                         Notice.show("Saved locally — \(error.localizedDescription)")
                     }

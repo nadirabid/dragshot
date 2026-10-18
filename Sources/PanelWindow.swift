@@ -185,12 +185,14 @@ final class PanelWindow: NSPanel, NSTextViewDelegate, NSWindowDelegate {
         attachmentHeight.constant = previewSize.height
         attachment.prepare()
         dismissSessionPicker(restoreFocus: false)
-        let dockVisible = DSHIntegration.shared.isEnabled
+        let dockVisible = HarnessIntegration.destination != .local
         targetDock.isHidden = !dockVisible
         scrollBottomDefault.isActive = !dockVisible
         scrollBottomWithDock.isActive = dockVisible
-        targetChip.title = DSHIntegration.shared.targetLabel
-        targetChip.setAccessibilityValue(DSHIntegration.shared.targetAccessibilityLabel)
+        sendToLabel.stringValue = HarnessIntegration.usesDSH ? "Send to" : "Open in"
+        targetChip.configure(harness: HarnessIntegration.destination)
+        targetChip.title = HarnessIntegration.usesDSH ? DSHIntegration.shared.targetLabel : "Review draft"
+        targetChip.setAccessibilityValue(HarnessIntegration.usesDSH ? DSHIntegration.shared.targetAccessibilityLabel : "Open draft in \(HarnessIntegration.destination.title)")
         let initialHeight = 16 + previewSize.height + 14 + 26 + 18 + (dockVisible ? 38 : 0)
         placeAbove = rect.minY - initialHeight - 14 < screen.visibleFrame.minY + 16
         textView.string = ""
@@ -220,7 +222,7 @@ final class PanelWindow: NSPanel, NSTextViewDelegate, NSWindowDelegate {
         layout.ensureLayout(for: container)
         let usedHeight = layout.usedRect(for: container).height
         let textHeight = min(max(26, ceil(usedHeight)), 130)
-        let dockVisible = DSHIntegration.shared.isEnabled
+        let dockVisible = HarnessIntegration.destination != .local
         let height = 16 + previewSize.height + 14 + textHeight + 18 + (dockVisible ? 38 : 0)
         let visible = screen.visibleFrame
         let proposedX = userPositioned ? frame.minX : selection.midX - inputWidth / 2
@@ -271,7 +273,7 @@ final class PanelWindow: NSPanel, NSTextViewDelegate, NSWindowDelegate {
     var isSessionPickerVisible: Bool { sessionPicker != nil }
 
     func presentSessionPicker() {
-        guard DSHIntegration.shared.isEnabled, sessionPicker == nil, isVisible else { return }
+        guard HarnessIntegration.usesDSH, sessionPicker == nil, isVisible else { return }
         // A click on the chip while the picker is open closes it and then reaches
         // the chip. Do not immediately reopen on that same click.
         guard ProcessInfo.processInfo.systemUptime - pickerClosedAt > 0.25 else { return }
@@ -354,7 +356,7 @@ final class PanelWindow: NSPanel, NSTextViewDelegate, NSWindowDelegate {
 
     func textDidChange(_ notification: Notification) {
         if !isClearingSlash,
-           DSHIntegration.shared.isEnabled,
+           HarnessIntegration.usesDSH,
            sessionPicker == nil,
            textView.string == "/" {
             // DSH-style command entry: the whole empty message is now a slash.

@@ -15,6 +15,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard AppLocation.prepareLaunch() else { return }
         buildStatusItem()
         Lookit.shared.start()
+        DSHIntegration.shared.refreshHealth()
+        // A standalone .app carries its bridge as well. Do not initialize DSH
+        // itself or change the chosen harness; only repair a missing payload.
+        let profile = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".dsh/profiles/desktop")
+        if Bundle.main.bundleIdentifier == "local.lookit" && !DSHIntegration.shared.bridgeInstalled && FileManager.default.fileExists(atPath: profile.path) {
+            DSHIntegration.shared.installBridge { error in
+                if let error { Log.write("Bridge setup: \(error.localizedDescription)") }
+            }
+        }
         Diagnostics.write()
         Log.write("three-finger drag setting: \(Diagnostics.threeFingerDrag)")
 
@@ -118,11 +127,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if status.accessibility && !status.listener && (lastSetupStatus?.accessibility != true || lastSetupStatus?.inputMonitoring != status.inputMonitoring) {
             EventTap.start()
         }
+        DSHIntegration.shared.refreshHealth()
         setupWindow?.refreshPreferences()
         if lastLoginStatus != LaunchAtLogin.status.rawValue {
             lastLoginStatus = LaunchAtLogin.status.rawValue
             refreshMenu()
         }
+        Diagnostics.write()
         let updated = SetupStatus.current
         if updated != lastSetupStatus {
             lastSetupStatus = updated

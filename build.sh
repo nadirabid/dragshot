@@ -120,6 +120,11 @@ if compgen -G "$ROOT/Sources/*.png" > /dev/null; then
 fi
 cp "$ROOT/assets/Lookit.icns" "$APP/Contents/Resources/Lookit.icns"
 
+# Ship the same dependency-free bridge installer for standalone app setup/repair.
+mkdir -p "$APP/Contents/Resources/DSHBridge"
+cp "$ROOT/dsh-lookit/install.sh" "$ROOT/dsh-lookit/package.json" "$APP/Contents/Resources/DSHBridge/"
+cp -R "$ROOT/dsh-lookit/lib" "$APP/Contents/Resources/DSHBridge/lib"
+
 echo "==> signing (identity: $SIGN_ID)"
 codesign --force --deep --sign "$SIGN_ID" \
   --identifier "$BUNDLE_ID" \

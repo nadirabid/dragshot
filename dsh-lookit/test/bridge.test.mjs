@@ -111,7 +111,7 @@ test('hello advertises the protocol and methods', async () => {
         const response = await call(paths.socket, { method: 'hello' })
         assert.equal(response.ok, true)
         assert.equal(response.result.protocol, PROTOCOL)
-        assert.deepEqual(response.result.methods, ['hello', 'ping', 'list', 'send'])
+        assert.deepEqual(response.result.methods, ['hello', 'ping', 'list', 'send', 'reveal'])
     } finally {
         await bridge.stop()
     }
@@ -197,6 +197,7 @@ test('send recent picks the most recently used session and preserves text then i
         assert.deepEqual(response.result, {
             sessionId: 'recent',
             title: 'The recent one',
+            opened: false,
             created: false,
             target: 'recent',
         })
@@ -369,6 +370,8 @@ test('apply mounts and unmounts the bridge through ctx.effect', async () => {
     const cleanups = []
     const ctx = {
         sessionController: controller,
+        workspaceRegistry: { list: () => [] },
+        webServer: { register: () => () => {} },
         logger: { warn() {} },
         effect(fn) {
             cleanups.push(fn())
@@ -393,4 +396,47 @@ test('apply mounts and unmounts the bridge through ctx.effect', async () => {
     assert.equal(response.ok, true)
     await cleanups[0]()
     await assert.rejects(fs.stat(paths.socket))
+})
+
+test('new capture joins the matching DSH workspace and reveals exactly the accepted session', async () => {
+    const paths = await workspace()
+    const { controller, calls } = fakeController([summary('recent', 'Recent', 100, { cwd: paths.root })])
+    const revealed = []
+    const bridge = await startBridge(controller, paths, {
+        workspaceRegistry: { list: () => [{ id: 'workspace-1', path: paths.root }] },
+        reveal: async id => { assert.equal(calls.prompted.length, 1); revealed.push(id); return true },
+    })
+    try {
+        const response = await call(paths.socket, { method: 'send', params: { target: 'new', text: 'hello', openAfterSend: true } })
+        assert.equal(response.ok, true)
+        assert.deepEqual(calls.created, [{ workspaceId: 'workspace-1' }])
+        assert.deepEqual(revealed, [response.result.sessionId])
+        assert.equal(response.result.opened, true)
+    } finally { await bridge.stop() }
+})
+
+test('failed navigation preserves successful delivery and does not submit twice', async () => {
+    const paths = await workspace()
+    const { controller, calls } = fakeController([summary('recent', 'Recent', 100)])
+    const bridge = await startBridge(controller, paths, { reveal: async () => { throw new Error('UI unavailable') } })
+    try {
+        const response = await call(paths.socket, { method: 'send', params: { text: 'hello', openAfterSend: true } })
+        assert.equal(response.ok, true)
+        assert.equal(response.result.opened, false)
+        assert.equal(calls.prompted.length, 1)
+    } finally { await bridge.stop() }
+})
+
+test('open-after-send off does not navigate; rejected prompt does not navigate', async () => {
+    for (const reject of [false, true]) {
+        const paths = await workspace()
+        const { controller } = fakeController([summary('recent', 'Recent', 100)], { promptError: reject ? new Error('rejected') : undefined })
+        let navigated = false
+        const bridge = await startBridge(controller, paths, { reveal: async () => { navigated = true; return true } })
+        try {
+            const response = await call(paths.socket, { method: 'send', params: { text: 'hello', openAfterSend: reject } })
+            assert.equal(response.ok, !reject)
+            assert.equal(navigated, false)
+        } finally { await bridge.stop() }
+    }
 })
